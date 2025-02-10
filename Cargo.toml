@@ -1,0 +1,13 @@
+[package]
+name = "retriers"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1.86"
+rand = "0.9.0"
+tokio = { version = "1.43.0", features = ["rt", "rt-multi-thread", "macros"] }
+
+
+retriers_lib = {path = "retriers_lib"}
+retriers_macro = {path = "retriers_macro" }
