@@ -1,13 +1,17 @@
 use proc_macro::TokenStream;
-use quote::{format_ident, quote, ToTokens};
+use quote::{format_ident, quote, quote_spanned, ToTokens};
 use std::fs;
 use std::ops::Deref;
+use proc_macro2::Span;
 use syn::{
     parse_macro_input, AngleBracketedGenericArguments, FnArg, ItemFn, PatType, PathArguments,
     ReturnType, Type,
 };
+use syn::spanned::Spanned;
+
 #[proc_macro_attribute]
 pub fn retryable(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let original_tokens:proc_macro2::TokenStream  = item.clone().into();
     let input_fn = parse_macro_input!(item as ItemFn);
 
     let fn_name = &input_fn.sig.ident;
@@ -16,10 +20,13 @@ pub fn retryable(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let inputs = &input_fn.sig.inputs;
     let mut ret_type_t: Option<TokenStream> = None;
     let mut ret_type_e: Option<TokenStream> = None;
+    let mut ctime_type_loc: Option<Span> = None;
     let output = match &input_fn.sig.output {
         ReturnType::Type(_, ty) => {
             match ty.deref() {
                 Type::Path(p) => {
+                    ctime_type_loc=Some(p.span().clone());
+
                     for seg in &p.path.segments {
                         let p2 = &seg.arguments;
                         match p2 {
@@ -46,11 +53,17 @@ pub fn retryable(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     };
 
+    let mut _ctime_err = quote! {};
+    let mut use_ctime_error = false;
     if ret_type_t.is_none() || ret_type_e.is_none() {
-        panic!("Could not determine Signature for Executor - expected return type to be of the form Retryable<T,E>. Type Aliases that change this form may affect the macros");
+        let span =ctime_type_loc.unwrap();
+        use_ctime_error = true;
+        _ctime_err = quote_spanned! {span=>
+            compile_error!("Return type must be of the form RetryResult<T, E>. The retryable proc macro is unable to determine the underlying value and error types behind a type alias.");
+        };
     }
-    let ret_type_t: proc_macro2::TokenStream = ret_type_t.unwrap().into();
-    let ret_type_e: proc_macro2::TokenStream = ret_type_e.unwrap().into();
+    let ret_type_t: proc_macro2::TokenStream = ret_type_t.unwrap_or(quote!{()}.into()).into();
+    let ret_type_e: proc_macro2::TokenStream = ret_type_e.unwrap_or(quote!{()}.into()).into();
 
     let body = &input_fn.block;
 
@@ -71,6 +84,7 @@ pub fn retryable(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let expanded = quote! {
 
+
         #[allow(non_camel_case_types)]
         struct #struct_name(#(#struct_fields,)*);
 
@@ -84,11 +98,21 @@ pub fn retryable(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         #[doc(hidden)]
         mod __RETRIERS__INTERNAL{
-            use  retriers_lib::*;
             use super::*;
             #[doc(hidden)]
             pub async fn #inner_fn_name(#inputs) -> #output #body
         }
+    };
+
+    let expanded = if use_ctime_error {
+        /*throw a compilation error but retain the original tokens so that it doesn't totally break lsp/intellisense etc*/
+        quote! {
+            #original_tokens
+            #_ctime_err
+
+        }
+    } else {
+        expanded
     };
 
     TokenStream::from(expanded).into()
