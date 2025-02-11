@@ -37,6 +37,20 @@ pub trait Executor<T, E>: Send + Sync {
         r.run().await
     }
 
+    async fn retry_with_default_policy(self) -> Result<T, E>
+    where
+        Self: Sized + 'static,
+        T: Send + Sync,
+        E: Send + Sync,
+    {
+        let mut r = Retryer {
+            policy:DEFAULT_POLICY,
+            count: 0,
+            function: Box::new(self),
+        };
+        r.run().await
+    }
+
     async fn call(self) -> RetryResult<T, E>
     where
         Self: Sized + 'static,
