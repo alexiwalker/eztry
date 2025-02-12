@@ -1,7 +1,7 @@
 use std::cmp;
 use std::cmp::Ordering;
 use crate::RetryLimit::{Limited, Unlimited};
-pub use async_trait::async_trait;
+use async_trait::async_trait;
 
 const DEFAULT_POLICY: RetryPolicy = RetryPolicy {
     limit: RetryLimit::Unlimited,
@@ -116,14 +116,22 @@ impl PartialEq<usize> for RetryLimit {
 
 //allow somecount > retrylimit comparison without having to match on the enum
 impl PartialOrd<usize> for RetryLimit {
-    fn partial_cmp(&self, other: &usize) -> Option<Ordering> {
+    fn partial_cmp(&self, count: &usize) -> Option<Ordering> {
         match self {
-            Unlimited => Some(Ordering::Greater),
-            Limited(a) => a.partial_cmp(other),
+            Unlimited => Some(Ordering::Less),
+            Limited(lim) => {
+                /* more explicit than using the cmp traits directly because its representing the logic of limits better*/
+                if count < lim {
+                    Some(Ordering::Less)
+                } else if count == lim {
+                    Some(Ordering::Equal)
+                } else {
+                    Some(Ordering::Greater)
+                }
+            }
         }
     }
 }
-
 impl PartialEq<RetryLimit> for usize {
     fn eq(&self, other: &RetryLimit) -> bool {
         other.eq(self)
@@ -170,14 +178,13 @@ impl<T, E> Retryer<T, E> {
         self.count = 0;
         loop {
             self.count += 1;
-
             let r = f.execute().await;
-
             match r {
                RetryResult::Success(v) => return Ok(v),
                RetryResult::Abort(v) => return Err(v),
                RetryResult::Retryable(e) => {
                     if self.count > policy.limit {
+                        println!("Retry limit reached, {} {:?}", self.count, policy.limit);
                         return Err(e);
                     }
                     policy.wait(self.count).await
