@@ -6,38 +6,26 @@ fn generate_random_number() -> u8 {
     rng.random_range(1..=100)
 }
 
-//
-// #[retry_prepare]
-// async fn prepared(
-//     v: u32,
-//     s: String,
-//     b: bool,
-//     f: f32,
-// ) -> RetryResult<(String,u32), String> {
-//     let rng = generate_random_number();
-//     if rng < 30 {
-//         let data_1 = v;
-//         let data_2 = s;
-//         let s = format!("{data_1}_{data_2}_{b}::{f}");
-//         let _ = tokio::fs::write("./tmp_file.txt", &s).await;
-//         success((s, data_1))
-//     } else if rng > 95 {
-//         abort("simulated error".to_string())
-//     } else {
-//         retry("simulated retry".to_string())
-//     }
-// }
 
-fn default_policy()->RetryPolicy {
-    RetryPolicyBuilder::new_with_defaults()
-        .delay_calculator(|policy, attempt| {
-            let multiplier = 2u64.pow(attempt as u32 - 1);
-            let delay = policy.base_delay * multiplier;
-            delay as u64
-        })
-        .limit(RetryLimit::Limited(5))
-        .base_delay(250)
-        .build_with_defaults()
+#[retry_prepare]
+async fn prep2(
+    v: u32,
+    s: String,
+    b: bool,
+    f: f32,
+) -> RetryResult<(String,u32), String> {
+    let rng = generate_random_number();
+    if rng < 30 {
+        let data_1 = v;
+        let data_2 = s;
+        let s = format!("{data_1}_{data_2}_{b}::{f}");
+        let _ = tokio::fs::write("./tmp_file.txt", &s).await;
+        success((s, data_1))
+    } else if rng > 95 {
+        abort("simulated error".to_string())
+    } else {
+        retry("simulated retry".to_string())
+    }
 }
 
 #[tokio::main]
@@ -53,7 +41,7 @@ async fn main() {
     //     }
     // }
 
-    let x = retryable(1u32, "something".to_string(), true, 0.01).await;
+    let x = prep2(1u32, "something".to_string(), true, 0.01).retry_with_default_policy().await;
     // let x = retry_func(1u32, "something".to_string(), true, 0.01).retry_with_policy(default_policy()).await;
     match x {
         Ok(v) => {
@@ -71,7 +59,7 @@ fn custom_retry_policy()->RetryPolicy {
         .delay_calculator(|policy, attempt| {
             let multiplier = 2u64.pow(attempt as u32 - 1);
             let delay = policy.base_delay * multiplier;
-            delay as u64
+            delay
         })
         .limit(RetryLimit::Limited(5))
         .base_delay(1000)
@@ -79,26 +67,26 @@ fn custom_retry_policy()->RetryPolicy {
 }
 
 
-#[retry]
-async fn retryable(
-    v: u32,
-    s: String,
-    b: bool,
-    f: f32,
-) -> RetryResult<(String, u32), String> {
-    let mut rng = generate_random_number();
-    if rng < 30 {
-        let data_1 = v;
-        let data_2 = s;
-        let s = format!("{data_1}_{data_2}_{b}::{f}");
-        let _ = tokio::fs::write("./tmp_file.txt", &s).await;
-        success((s, data_1))
-    } else if rng > 95 {
-        abort("simulated error".to_string())
-    } else {
-        retry("simulated retry".to_string())
-    }
-}
+// #[retry]
+// async fn retryable(
+//     v: u32,
+//     s: String,
+//     b: bool,
+//     f: f32,
+// ) -> RetryResult<(String, u32), String> {
+//     let rng = generate_random_number();
+//     if rng < 30 {
+//         let data_1 = v;
+//         let data_2 = s;
+//         let s = format!("{data_1}_{data_2}_{b}::{f}");
+//         let _ = tokio::fs::write("./tmp_file.txt", &s).await;
+//         success((s, data_1))
+//     } else if rng > 95 {
+//         abort("simulated error".to_string())
+//     } else {
+//         retry("simulated retry".to_string())
+//     }
+// }
 
 /*
 #[allow(non_camel_case_types)]

@@ -29,12 +29,11 @@ pub trait Executor<T, E>: Send + Sync {
         T: Send + Sync,
         E: Send + Sync,
     {
-        let mut r = Retryer {
+        Retryer {
             policy,
             count: 0,
             function: Box::new(self),
-        };
-        r.run().await
+        }.run().await
     }
 
     async fn retry_with_default_policy(self) -> Result<T, E>
@@ -43,12 +42,11 @@ pub trait Executor<T, E>: Send + Sync {
         T: Send + Sync,
         E: Send + Sync,
     {
-        let mut r = Retryer {
+        Retryer {
             policy:DEFAULT_POLICY,
             count: 0,
             function: Box::new(self),
-        };
-        r.run().await
+        }.run().await
     }
 
     async fn call(self) -> RetryResult<T, E>
@@ -188,9 +186,6 @@ impl<T, E> Retryer<T, E> {
                         return Err(e);
                     }
                     policy.wait(self.count).await
-                }
-                _ => {
-                    unreachable!("Got none immediately after the last_result field was set")
                 }
             }
         }
