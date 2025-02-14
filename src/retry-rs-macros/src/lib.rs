@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
-use std::ops::{Deref};
-use syn::punctuated::{Punctuated};
+use std::ops::Deref;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
 use syn::{
@@ -63,29 +63,22 @@ impl RetryableParseData {
         let mut ctime_type_loc: Option<Span> = None;
         let output = match &input_fn.sig.output {
             ReturnType::Type(_, ty) => {
-                match ty.deref() {
-                    Type::Path(p) => {
-                        ctime_type_loc = Some(p.span().clone());
+                if let Type::Path(p) = ty.deref() {
+                    ctime_type_loc = Some(p.span().clone());
 
-                        for seg in &p.path.segments {
-                            let p2 = &seg.arguments;
-                            match p2 {
-                                PathArguments::AngleBracketed(ab) => {
-                                    for x in &ab.args {
-                                        if ret_type_t.is_none() {
-                                            ret_type_t = Some(x.to_token_stream().into());
-                                        } else if ret_type_e.is_none() {
-                                            ret_type_e = Some(x.to_token_stream().into());
-                                        }
-                                    }
+                    for seg in &p.path.segments {
+                        let p2 = &seg.arguments;
+                        if let PathArguments::AngleBracketed(ab) = p2 {
+                            for x in &ab.args {
+                                if ret_type_t.is_none() {
+                                    ret_type_t = Some(x.to_token_stream().into());
+                                } else if ret_type_e.is_none() {
+                                    ret_type_e = Some(x.to_token_stream().into());
                                 }
-                                _ => {}
-                            };
-                        }
+                            }
+                        };
                     }
-                    _ => {}
                 };
-
                 quote! { #ty }
             }
             _ => {
@@ -112,7 +105,7 @@ impl RetryableParseData {
             ret_type_e: ret_type_e.clone(),
             output: output.clone(),
             original_body: *body.clone(),
-            original_tokens: original_tokens.clone().into(),
+            original_tokens: original_tokens.clone(),
             ctime_error: _ctime_err.clone(),
         }
     }
@@ -225,7 +218,6 @@ impl RetryableParseData {
                 #original_tokens
                 #_ctime_err
             }
-
         } else {
             quote! {
            async fn #struct_name(#inputs) -> #output {
@@ -279,18 +271,15 @@ impl RetryableParseData {
                 #policy_call
             }
         }
-
         }
-
     }
 
     fn get_policy_call(policy_fn: Option<Ident>) -> proc_macro2::TokenStream {
-        let policy_call = if let Some(policy_fn) = policy_fn {
+        if let Some(policy_fn) = policy_fn {
             quote! { ex.retry_with_policy(#policy_fn()).await }
         } else {
             quote! { ex.retry_with_default_policy().await }
-        };
-        policy_call
+        }
     }
 
     fn get_arg_names(inputs: &Punctuated<FnArg, Comma>) -> proc_macro2::TokenStream {

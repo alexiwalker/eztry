@@ -1,10 +1,9 @@
-use std::cmp;
-use std::cmp::Ordering;
 use crate::RetryLimit::{Limited, Unlimited};
 use async_trait::async_trait;
+use std::cmp::Ordering;
 
 const DEFAULT_POLICY: RetryPolicy = RetryPolicy {
-    limit: RetryLimit::Unlimited,
+    limit: Unlimited,
     base_delay: 1000,
     delay_time: default_next_delay,
 };
@@ -43,7 +42,7 @@ pub trait Executor<T, E>: Send + Sync {
         E: Send + Sync,
     {
         Retryer {
-            policy:DEFAULT_POLICY,
+            policy: DEFAULT_POLICY,
             count: 0,
             function: Box::new(self),
         }.run().await
@@ -77,9 +76,10 @@ pub enum RetryResult<T, E> {
     Abort(E),
 }
 
-impl<T, E> Into<Result<T, E>> for RetryResult<T, E> {
-    fn into(self) -> Result<T, E> {
-        match self {
+
+impl<T, E> From<RetryResult<T, E>> for Result<T, E> {
+    fn from(r: RetryResult<T, E>) -> Self {
+        match r {
             RetryResult::Success(t) => Ok(t),
             RetryResult::Abort(e) | RetryResult::Retryable(e) => Err(e),
         }
@@ -93,7 +93,7 @@ pub enum RetryLimit {
     Limited(usize),
 }
 
-impl cmp::PartialEq for RetryLimit {
+impl PartialEq for RetryLimit {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Unlimited, Unlimited) => true,
@@ -118,13 +118,10 @@ impl PartialOrd<usize> for RetryLimit {
         match self {
             Unlimited => Some(Ordering::Less),
             Limited(lim) => {
-                /* more explicit than using the cmp traits directly because its representing the logic of limits better*/
-                if count < lim {
-                    Some(Ordering::Less)
-                } else if count == lim {
-                    Some(Ordering::Equal)
-                } else {
-                    Some(Ordering::Greater)
+                match count.cmp(lim) {
+                    Ordering::Less => Some(Ordering::Less),
+                    Ordering::Equal => Some(Ordering::Equal),
+                    Ordering::Greater => Some(Ordering::Greater),
                 }
             }
         }
@@ -150,7 +147,7 @@ pub struct RetryPolicy {
 }
 
 impl RetryPolicy {
-    pub async fn wait(&self, count: usize) -> () {
+    pub async fn wait(&self, count: usize) {
         let t = (self.delay_time)(self, count);
         let t = std::time::Duration::from_millis(t);
         tokio::time::sleep(t).await;
@@ -168,7 +165,6 @@ pub struct Retryer<T, E> {
 }
 
 
-
 impl<T, E> Retryer<T, E> {
     pub async fn run(mut self) -> Result<T, E> {
         let f = &self.function;
@@ -182,7 +178,6 @@ impl<T, E> Retryer<T, E> {
                 RetryResult::Abort(v) => return Err(v),
                 RetryResult::Retryable(e) => {
                     if self.count > policy.limit {
-                        println!("Retry limit reached, {} {:?}", self.count, policy.limit);
                         return Err(e);
                     }
                     policy.wait(self.count).await
@@ -221,13 +216,11 @@ pub struct RetryPolicyBuilder {
 pub mod backoff_policy {
     pub fn exponential_backoff(policy: &crate::RetryPolicy, attempt: usize) -> u64 {
         let multiplier = 2u64.pow(attempt as u32 - 1);
-        let delay = policy.base_delay * multiplier;
-        delay
+        policy.base_delay * multiplier
     }
 
     pub fn linear_backoff(policy: &crate::RetryPolicy, attempt: usize) -> u64 {
-        let delay = policy.base_delay * attempt as u64;
-        delay
+        policy.base_delay * attempt as u64
     }
 
     pub fn constant_backoff(policy: &crate::RetryPolicy, _attempt: usize) -> u64 {
@@ -242,7 +235,7 @@ impl RetryPolicyBuilder {
 
     pub fn new_with_defaults() -> Self {
         Self {
-            limit: Some(RetryLimit::Unlimited),
+            limit: Some(Unlimited),
             base_delay: Some(1000),
             backoff_policy: Some(default_next_delay),
         }
