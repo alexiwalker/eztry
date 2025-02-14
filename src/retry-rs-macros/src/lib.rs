@@ -1,7 +1,6 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
-use std::fs;
 use std::ops::{Deref};
 use syn::punctuated::{Punctuated};
 use syn::spanned::Spanned;
@@ -16,15 +15,9 @@ use syn::{
 pub fn retry_prepare(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let original_tokens: proc_macro2::TokenStream = item.clone().into();
     let input_fn = parse_macro_input!(item as ItemFn);
-
     let retryable_data = RetryableParseData::from_function(input_fn, original_tokens);
-
     let expanded = retryable_data.expand_prepared();
-
-    let z = TokenStream::from(expanded);
-    let s = z.to_string();
-    fs::write("src/generated.txt", s).expect("Unable to write file");
-    z
+    TokenStream::from(expanded)
 }
 
 #[proc_macro_attribute]
@@ -41,14 +34,11 @@ pub fn retry(attr: TokenStream, item: TokenStream) -> TokenStream {
     let retryable_data = RetryableParseData::from_function(input_fn, original_tokens);
     let expanded = retryable_data.expand_retry(policy_fn);
 
-    let z = TokenStream::from(expanded);
-    let s = z.to_string();
-    fs::write("src/generated.txt", s).expect("Unable to write file");
-    z
+    TokenStream::from(expanded)
 }
 
 struct RetryableParseData {
-    struct_name: proc_macro2::Ident,
+    struct_name: Ident,
     inputs: Punctuated<FnArg, Comma>,
     ret_type_t: proc_macro2::TokenStream,
     ret_type_e: proc_macro2::TokenStream,
@@ -142,24 +132,13 @@ impl RetryableParseData {
 
         let use_ctime_error = !_ctime_err.is_empty();
 
-        // Extract parameter types for tuple struct
-        let struct_fields = inputs.iter().filter_map(|arg| {
-            if let FnArg::Typed(PatType { ty, .. }) = arg {
-                Some(quote! { #ty })
-            } else {
-                None
-            }
-        });
+        let struct_fields = Self::get_arg_types(inputs);
+        let param_names = Self::get_struct_field_names(inputs);
 
-        // Extract parameters for function call
-        let param_names = (0..inputs.len()).map(|i| {
-            let index = syn::Index::from(i);
-            quote! { self.#index.clone() }
-        });
 
         let expanded = quote! {
             #[allow(non_camel_case_types)]
-            struct #struct_name(#(#struct_fields,)*);
+            struct #struct_name(#struct_fields);
             impl Executor<#ret_type_t, #ret_type_e> for #struct_name {
                 #[allow(
                     elided_named_lifetimes,
@@ -188,7 +167,7 @@ impl RetryableParseData {
                         }
                         let __self = self;
                         let __ret: #output = {
-                            __RETRIERS__INTERNAL::#inner_fn_name(#(#param_names),*)
+                            __RETRIERS__INTERNAL::#inner_fn_name(#param_names)
                                 .await
                         };
                         #[allow(unreachable_code)] __ret

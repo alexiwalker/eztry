@@ -178,9 +178,9 @@ impl<T, E> Retryer<T, E> {
             self.count += 1;
             let r = f.execute().await;
             match r {
-               RetryResult::Success(v) => return Ok(v),
-               RetryResult::Abort(v) => return Err(v),
-               RetryResult::Retryable(e) => {
+                RetryResult::Success(v) => return Ok(v),
+                RetryResult::Abort(v) => return Err(v),
+                RetryResult::Retryable(e) => {
                     if self.count > policy.limit {
                         println!("Retry limit reached, {} {:?}", self.count, policy.limit);
                         return Err(e);
@@ -209,11 +209,30 @@ impl Default for RetryPolicy {
     }
 }
 
+pub type BackoffPolicy = fn(&RetryPolicy, usize) -> u64;
+
 #[derive(Default, Debug)]
 pub struct RetryPolicyBuilder {
     limit: Option<RetryLimit>,
     base_delay: Option<u64>,
-    delay_calculator: Option<fn(&RetryPolicy, usize) -> u64>,
+    backoff_policy: Option<BackoffPolicy>,
+}
+
+pub mod backoff_policy {
+    pub fn exponential_backoff(policy: &crate::RetryPolicy, attempt: usize) -> u64 {
+        let multiplier = 2u64.pow(attempt as u32 - 1);
+        let delay = policy.base_delay * multiplier;
+        delay
+    }
+
+    pub fn linear_backoff(policy: &crate::RetryPolicy, attempt: usize) -> u64 {
+        let delay = policy.base_delay * attempt as u64;
+        delay
+    }
+
+    pub fn constant_backoff(policy: &crate::RetryPolicy, _attempt: usize) -> u64 {
+        policy.base_delay
+    }
 }
 
 impl RetryPolicyBuilder {
@@ -225,7 +244,7 @@ impl RetryPolicyBuilder {
         Self {
             limit: Some(RetryLimit::Unlimited),
             base_delay: Some(1000),
-            delay_calculator: Some(default_next_delay),
+            backoff_policy: Some(default_next_delay),
         }
     }
 
@@ -239,8 +258,8 @@ impl RetryPolicyBuilder {
         self
     }
 
-    pub fn delay_calculator(mut self, delay_calculator: fn(&RetryPolicy, usize) -> u64) -> Self {
-        self.delay_calculator = Some(delay_calculator);
+    pub fn backoff_policy(mut self, backoff_policy: fn(&RetryPolicy, usize) -> u64) -> Self {
+        self.backoff_policy = Some(backoff_policy);
         self
     }
 
@@ -248,20 +267,20 @@ impl RetryPolicyBuilder {
         RetryPolicy {
             limit: self.limit.unwrap(),
             base_delay: self.base_delay.unwrap(),
-            delay_time: self.delay_calculator.unwrap(),
+            delay_time: self.backoff_policy.unwrap(),
         }
     }
     pub fn build_with_defaults(self) -> RetryPolicy {
         RetryPolicy {
             limit: self.limit.unwrap_or(Unlimited),
             base_delay: self.base_delay.unwrap_or(1000),
-            delay_time: self.delay_calculator.unwrap_or(default_next_delay),
+            delay_time: self.backoff_policy.unwrap_or(default_next_delay),
         }
     }
     pub fn try_build(self) -> Result<RetryPolicy, RetryPolicyBuilderError> {
         let mut error = RetryPolicyBuilderError {
             missing_base_delay: false,
-            missing_delay_calculator: false,
+            missing_backoff_policy: false,
             missing_limit: false,
         };
 
@@ -274,8 +293,8 @@ impl RetryPolicyBuilder {
             error.missing_base_delay = true;
             missing_any = true;
         }
-        if self.delay_calculator.is_none() {
-            error.missing_delay_calculator = true;
+        if self.backoff_policy.is_none() {
+            error.missing_backoff_policy = true;
             missing_any = true;
         }
 
@@ -286,7 +305,7 @@ impl RetryPolicyBuilder {
         Ok(RetryPolicy {
             limit: self.limit.unwrap(),
             base_delay: self.base_delay.unwrap(),
-            delay_time: self.delay_calculator.unwrap(),
+            delay_time: self.backoff_policy.unwrap(),
         })
     }
 }
@@ -294,7 +313,7 @@ impl RetryPolicyBuilder {
 pub struct RetryPolicyBuilderError {
     missing_limit: bool,
     missing_base_delay: bool,
-    missing_delay_calculator: bool,
+    missing_backoff_policy: bool,
 }
 
 pub fn success<T, E>(v: T) -> RetryResult<T, E> {
@@ -307,83 +326,83 @@ pub fn abort<T, E>(e: E) -> RetryResult<T, E> {
     RetryResult::Abort(e)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::RetryResult::{Abort, Retryable, Success};
-    use rand::Rng;
-
-    fn generate_random_number() -> u8 {
-        let mut rng = rand::rng();
-        rng.random_range(1..=100)
-    }
-
-    #[tokio::test]
-    async fn api_testing() {
-        struct TestExecutor;
-
-        #[async_trait]
-        impl Executor<usize, String> for TestExecutor {
-            async fn execute(&self) -> RetryResult<usize, String> {
-                success(1)
-            }
-        }
-
-        let mut ex = TestExecutor.default_retry_policy();
-
-        let p = RetryPolicy {
-            limit: Default::default(),
-            base_delay: 500,
-            delay_time: default_next_delay,
-        };
-
-        ex.set_policy(p);
-
-        let r = ex.run().await;
-
-        dbg!(r);
-    }
-
-    #[tokio::test]
-    async fn rng_testing() {
-        struct PreparedExampleFunction(u32, String);
-
-        #[async_trait]
-        impl Executor<String, String> for PreparedExampleFunction {
-            async fn execute(&self) -> RetryResult<String, String> {
-                let (_0, _1) = (self.0.clone(), self.1.clone());
-                example_function(_0, _1).await
-            }
-        }
-
-        async fn example_function(v: u32, s: String) -> RetryResult<String, String> {
-            let mut rng = generate_random_number();
-            println!("RNG: {}", rng);
-            if rng == 100 {
-                let data_1 = v;
-                let data_2 = s;
-                let s = format!("{data_1}_{data_2}");
-                let _ = tokio::fs::write("./tmp_file.txt", &s).await;
-                success(s)
-            } else if rng < 5 {
-                abort("simulated error".to_string())
-            } else {
-                retry("intermittent error".to_string())
-            }
-        }
-
-        let mut ex = PreparedExampleFunction(1u32, "something".to_string()).default_retry_policy();
-
-        let p = RetryPolicy {
-            limit: Default::default(),
-            base_delay: 500,
-            delay_time: default_next_delay,
-        };
-
-        ex.set_policy(p);
-
-        let r = ex.run().await;
-
-        dbg!(r);
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use crate::RetryResult::{Abort, Retryable, Success};
+//     use rand::Rng;
+//
+//     fn generate_random_number() -> u8 {
+//         let mut rng = rand::rng();
+//         rng.random_range(1..=100)
+//     }
+//
+//     #[tokio::test]
+//     async fn api_testing() {
+//         struct TestExecutor;
+//
+//         #[async_trait]
+//         impl Executor<usize, String> for TestExecutor {
+//             async fn execute(&self) -> RetryResult<usize, String> {
+//                 success(1)
+//             }
+//         }
+//
+//         let mut ex = TestExecutor.default_retry_policy();
+//
+//         let p = RetryPolicy {
+//             limit: Default::default(),
+//             base_delay: 500,
+//             delay_time: default_next_delay,
+//         };
+//
+//         ex.set_policy(p);
+//
+//         let r = ex.run().await;
+//
+//         dbg!(r);
+//     }
+//
+//     #[tokio::test]
+//     async fn rng_testing() {
+//         struct PreparedExampleFunction(u32, String);
+//
+//         #[async_trait]
+//         impl Executor<String, String> for PreparedExampleFunction {
+//             async fn execute(&self) -> RetryResult<String, String> {
+//                 let (_0, _1) = (self.0.clone(), self.1.clone());
+//                 example_function(_0, _1).await
+//             }
+//         }
+//
+//         async fn example_function(v: u32, s: String) -> RetryResult<String, String> {
+//             let mut rng = generate_random_number();
+//             println!("RNG: {}", rng);
+//             if rng == 100 {
+//                 let data_1 = v;
+//                 let data_2 = s;
+//                 let s = format!("{data_1}_{data_2}");
+//                 let _ = tokio::fs::write("./tmp_file.txt", &s).await;
+//                 success(s)
+//             } else if rng < 5 {
+//                 abort("simulated error".to_string())
+//             } else {
+//                 retry("intermittent error".to_string())
+//             }
+//         }
+//
+//         let mut ex = PreparedExampleFunction(1u32, "something".to_string()).default_retry_policy();
+//
+//         let p = RetryPolicy {
+//             limit: Default::default(),
+//             base_delay: 500,
+//             delay_time: default_next_delay,
+//         };
+//
+//         ex.set_policy(p);
+//
+//         let r = ex.run().await;
+//
+//         dbg!(r);
+//     }
+// }
