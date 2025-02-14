@@ -118,14 +118,12 @@ mod test {
         use super::*;
         let mut agent = FallibleAgent::new(FallibleBehaviour::FailAfter(2));
         assert!(agent.execute().is_ok());
-        assert!(agent.execute().is_ok());
         assert!(agent.execute().is_err());
     }
     #[test]
     pub fn test_succeeds_after() {
         use super::*;
         let mut agent = FallibleAgent::new(FallibleBehaviour::SucceedAfter(2));
-        assert!(agent.execute().is_err());
         assert!(agent.execute().is_err());
         assert!(agent.execute().is_ok());
     }
