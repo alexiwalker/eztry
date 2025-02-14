@@ -16,7 +16,7 @@ mod tests {
     
 
     fn retry_5_times() -> RetryPolicy {
-        RetryPolicyBuilder::new_with_defaults()
+        RetryPolicyBuilder::new()
             .limit(RetryLimit::Limited(5))
             .backoff_policy(linear_backoff)
             .base_delay(100)
