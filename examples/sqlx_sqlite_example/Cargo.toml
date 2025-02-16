@@ -1,0 +1,12 @@
+[package]
+name = "sqlx_sqlite_example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+retry-rs = { workspace = true }
+retry-rs-macros = { workspace = true }
+
+sqlx = { version = "0.8.3", features = ["sqlite", "runtime-tokio"] }
+tokio = { version = "1.43.0", features = ["full"] }
+

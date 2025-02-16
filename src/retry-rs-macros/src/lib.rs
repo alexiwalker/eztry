@@ -312,7 +312,7 @@ impl RetryableParseData {
             }
         } else {
 
-            if(is_self) {
+            if is_self {
 
                 let policy = if policy_fn.is_none() {
                     quote! { RetryPolicy::default() }
@@ -450,16 +450,15 @@ impl RetryableParseData {
         match first_input {
             None => {}
             Some(input) => match input {
-                FnArg::Receiver(p) => {
-                    fs::write("debug.txt", format!("{:?}", p.to_token_stream())).unwrap();
+                FnArg::Receiver(_) => {
                     skip_first = true;
                 }
-                FnArg::Typed(PatType { pat, .. }) => {}
+                FnArg::Typed(PatType { .. }) => {}
             },
         }
 
         let param_names = (0..inputs.len()).filter_map(|i| {
-            if (skip_first && i == 0) {
+            if skip_first && i == 0 {
                 return None;
             }
 
