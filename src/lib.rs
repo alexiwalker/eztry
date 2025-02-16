@@ -32,7 +32,9 @@ pub trait Executor<T, E>: Send + Sync {
             policy,
             count: 0,
             function: Box::new(self),
-        }.run().await
+        }
+            .run()
+            .await
     }
 
     async fn retry_with_default_policy(self) -> Result<T, E>
@@ -45,7 +47,9 @@ pub trait Executor<T, E>: Send + Sync {
             policy: DEFAULT_POLICY,
             count: 0,
             function: Box::new(self),
-        }.run().await
+        }
+            .run()
+            .await
     }
 
     async fn call(self) -> RetryResult<T, E>
@@ -75,7 +79,6 @@ pub enum RetryResult<T, E> {
     Retry(E), /* Propagated only if all retries exhausted*/
     Abort(E),
 }
-
 
 impl<T, E> From<RetryResult<T, E>> for Result<T, E> {
     fn from(r: RetryResult<T, E>) -> Self {
@@ -117,13 +120,11 @@ impl PartialOrd<usize> for RetryLimit {
     fn partial_cmp(&self, count: &usize) -> Option<Ordering> {
         match self {
             Unlimited => Some(Ordering::Less),
-            Limited(lim) => {
-                match count.cmp(lim) {
-                    Ordering::Less => Some(Ordering::Less),
-                    Ordering::Equal => Some(Ordering::Equal),
-                    Ordering::Greater => Some(Ordering::Greater),
-                }
-            }
+            Limited(lim) => match count.cmp(lim) {
+                Ordering::Less => Some(Ordering::Less),
+                Ordering::Equal => Some(Ordering::Equal),
+                Ordering::Greater => Some(Ordering::Greater),
+            },
         }
     }
 }
@@ -139,13 +140,11 @@ impl PartialOrd<RetryLimit> for usize {
     }
 }
 
-
 pub struct RetryPolicy {
     pub limit: RetryLimit,
     pub base_delay: u64,
     pub delay_time: fn(&RetryPolicy, usize) -> u64,
 }
-
 
 impl RetryPolicy {
     pub async fn wait(&self, count: usize) {
@@ -153,7 +152,7 @@ impl RetryPolicy {
         let t = std::time::Duration::from_millis(t);
         tokio::time::sleep(t).await;
     }
-    
+
     pub fn can_retry(&self, count: usize) -> bool {
         count < self.limit
     }
@@ -168,7 +167,6 @@ pub struct Retryer<T, E> {
     count: usize, /* not pub, meant to be internal only */
     pub function: AsyncFunction<T, E>,
 }
-
 
 impl<T, E> Retryer<T, E> {
     pub async fn run(mut self) -> Result<T, E> {
@@ -218,16 +216,16 @@ pub struct RetryPolicyBuilder {
     backoff_policy: Option<BackoffPolicy>,
 }
 
-pub fn exponential_backoff(policy: &crate::RetryPolicy, attempt: usize) -> u64 {
+pub fn exponential_backoff(policy: &RetryPolicy, attempt: usize) -> u64 {
     let multiplier = 2u64.pow(attempt as u32 - 1);
     policy.base_delay * multiplier
 }
 
-pub fn linear_backoff(policy: &crate::RetryPolicy, attempt: usize) -> u64 {
+pub fn linear_backoff(policy: &RetryPolicy, attempt: usize) -> u64 {
     policy.base_delay * attempt as u64
 }
 
-pub fn constant_backoff(policy: &crate::RetryPolicy, _attempt: usize) -> u64 {
+pub fn constant_backoff(policy: &RetryPolicy, _attempt: usize) -> u64 {
     policy.base_delay
 }
 
@@ -376,7 +374,6 @@ mod tests {
                 let data_1 = v;
                 let data_2 = s;
                 let s = format!("{data_1}_{data_2}");
-                let _ = tokio::fs::write("./tmp_file.txt", &s).await;
                 success(s)
             } else if rng < 5 {
                 abort("simulated error".to_string())

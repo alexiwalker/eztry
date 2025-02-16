@@ -20,7 +20,6 @@ impl SqliteDb {
         }
     }
 
-
     /// A test query that may fail, retry, or abort based on the rowid of the inserted row
     /// Simulates a query that may fail for any reason, and must check the result of the async operation
     /// to determine if a retry is appropriate

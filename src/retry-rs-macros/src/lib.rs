@@ -1,7 +1,6 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
-use std::fs;
 use std::ops::Deref;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -211,7 +210,6 @@ impl RetryableParseData {
         let has_self = Self::is_self(inputs);
 
         if has_self {
-
             let err_no_prepare_for_self = quote_spanned! {inputs.span()=>
                 compile_error!("Cannot use #[retry_prepare] on a function that takes self as an argument. Use #[retry] instead.");
             };
@@ -221,7 +219,6 @@ impl RetryableParseData {
                 #original_tokens
             };
         }
-
 
         let expanded = quote! {
             #[allow(non_camel_case_types)]
@@ -311,9 +308,7 @@ impl RetryableParseData {
                 #_ctime_err
             }
         } else {
-
             if is_self {
-
                 let policy = if policy_fn.is_none() {
                     quote! { RetryPolicy::default() }
                 } else {
@@ -322,89 +317,88 @@ impl RetryableParseData {
 
                 let formatted_inner_fn_name = format_ident!("{fn_name}__inner__");
 
-                 quote! {
-                     async fn #formatted_inner_fn_name(#inputs) -> RetryResult<#ret_type_t, #ret_type_e>
-                        #body
+                quote! {
+                        async fn #formatted_inner_fn_name(#inputs) -> RetryResult<#ret_type_t, #ret_type_e>
+                           #body
 
-                    async fn #fn_name(#inputs) -> Result<#ret_type_t, #ret_type_e> {
-                        let policy = #policy; /*default if not supplied in macro, otherwise use f()*/
-                        let mut i = 0;
-                        loop {
-                            i+=1;
-                            let r = self.#formatted_inner_fn_name(#without_receiver).await;
+                       async fn #fn_name(#inputs) -> Result<#ret_type_t, #ret_type_e> {
+                           let policy = #policy; /*default if not supplied in macro, otherwise use f()*/
+                           let mut i = 0;
+                           loop {
+                               i+=1;
+                               let r = self.#formatted_inner_fn_name(#without_receiver).await;
 
-                            match r {
-                                retry_rs::RetryResult::Success(s) => {
-                                    return Ok(s);
-                                }
-                                retry_rs::RetryResult::Retry(e) => {
-                                    if !policy.can_retry(i) {
-                                        return Err(e)
-                                    } else {
-                                        policy.wait(i).await
-                                    }
-                                }
-                                retry_rs::RetryResult::Abort(e) => {
-                                    return Err(e)
-                                }
-                            }
-                        }
-                    }
-             }
-
+                               match r {
+                                   retry_rs::RetryResult::Success(s) => {
+                                       return Ok(s);
+                                   }
+                                   retry_rs::RetryResult::Retry(e) => {
+                                       if !policy.can_retry(i) {
+                                           return Err(e)
+                                       } else {
+                                           policy.wait(i).await
+                                       }
+                                   }
+                                   retry_rs::RetryResult::Abort(e) => {
+                                       return Err(e)
+                                   }
+                               }
+                           }
+                       }
+                }
             } else {
                 quote! {
-               async fn #fn_name(#inputs) -> #output {
-                    #[allow(non_camel_case_types)]
-                    struct __inner__struct(#struct_fields);
-                    async fn  __inner__(#inputs) -> RetryResult<#ret_type_t, #ret_type_e> #body
-                    impl Executor<#ret_type_t, #ret_type_e> for __inner__struct {
-                        #[allow(
-                            elided_named_lifetimes,
-                            clippy::async_yields_async,
-                            clippy::diverging_sub_expression,
-                            clippy::let_unit_value,
-                            clippy::needless_arbitrary_self_type,
-                            clippy::no_effect_underscore_binding,
-                            clippy::shadow_same,
-                            clippy::type_complexity,
-                            clippy::type_repetition_in_bounds,
-                            clippy::used_underscore_binding
-                        )]
-                        fn execute<'life0, 'async_trait>(
-                            &'life0 self,
-                        ) -> ::core::pin::Pin<
-                            Box<
-                                dyn ::core::future::Future<
-                                    Output = RetryResult<#ret_type_t, #ret_type_e>,
-                                > + ::core::marker::Send + 'async_trait,
-                            >,
-                        >
-                        where
-                            'life0: 'async_trait,
-                            Self: 'async_trait,
-                        {
-                            Box::pin(async move {
-                                if let ::core::option::Option::Some(__ret) = ::core::option::Option::None::<
-                                    RetryResult<#ret_type_t, #ret_type_e>,
-                                > {
-                                    #[allow(unreachable_code)] return __ret;
-                                }
-                                let __self = self;
-                                let __ret: RetryResult<#ret_type_t, #ret_type_e> = {
-                                    __inner__(
-                                            #param_names
-                                        )
-                                        .await
-                                };
-                                #[allow(unreachable_code)] __ret
-                            })
+                   async fn #fn_name(#inputs) -> #output {
+                        #[allow(non_camel_case_types)]
+                        struct __inner__struct(#struct_fields);
+                        async fn  __inner__(#inputs) -> RetryResult<#ret_type_t, #ret_type_e> #body
+                        impl Executor<#ret_type_t, #ret_type_e> for __inner__struct {
+                            #[allow(
+                                elided_named_lifetimes,
+                                clippy::async_yields_async,
+                                clippy::diverging_sub_expression,
+                                clippy::let_unit_value,
+                                clippy::needless_arbitrary_self_type,
+                                clippy::no_effect_underscore_binding,
+                                clippy::shadow_same,
+                                clippy::type_complexity,
+                                clippy::type_repetition_in_bounds,
+                                clippy::used_underscore_binding
+                            )]
+                            fn execute<'life0, 'async_trait>(
+                                &'life0 self,
+                            ) -> ::core::pin::Pin<
+                                Box<
+                                    dyn ::core::future::Future<
+                                        Output = RetryResult<#ret_type_t, #ret_type_e>,
+                                    > + ::core::marker::Send + 'async_trait,
+                                >,
+                            >
+                            where
+                                'life0: 'async_trait,
+                                Self: 'async_trait,
+                            {
+                                Box::pin(async move {
+                                    if let ::core::option::Option::Some(__ret) = ::core::option::Option::None::<
+                                        RetryResult<#ret_type_t, #ret_type_e>,
+                                    > {
+                                        #[allow(unreachable_code)] return __ret;
+                                    }
+                                    let __self = self;
+                                    let __ret: RetryResult<#ret_type_t, #ret_type_e> = {
+                                        __inner__(
+                                                #param_names
+                                            )
+                                            .await
+                                    };
+                                    #[allow(unreachable_code)] __ret
+                                })
+                            }
                         }
+                        let ex = __inner__struct(#arg_names);
+                        #policy_call
                     }
-                    let ex = __inner__struct(#arg_names);
-                    #policy_call
                 }
-            }
             }
         }
     }
@@ -481,7 +475,9 @@ impl RetryableParseData {
         quote! { #(#types,)* }
     }
 
-    fn args_without_receiver(inputs: &Punctuated<FnArg, Comma>) -> Option<proc_macro2::TokenStream> {
+    fn args_without_receiver(
+        inputs: &Punctuated<FnArg, Comma>,
+    ) -> Option<proc_macro2::TokenStream> {
         let first_input = inputs.first();
         let is_self = matches!(first_input, Some(FnArg::Receiver(_)));
 
@@ -502,5 +498,4 @@ impl RetryableParseData {
 
         Some(quote! { #(#args),* })
     }
-
 }
