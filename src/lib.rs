@@ -146,11 +146,16 @@ pub struct RetryPolicy {
     pub delay_time: fn(&RetryPolicy, usize) -> u64,
 }
 
+
 impl RetryPolicy {
     pub async fn wait(&self, count: usize) {
         let t = (self.delay_time)(self, count);
         let t = std::time::Duration::from_millis(t);
         tokio::time::sleep(t).await;
+    }
+    
+    pub fn can_retry(&self, count: usize) -> bool {
+        count < self.limit
     }
 }
 
@@ -320,7 +325,6 @@ pub fn abort<T, E>(e: E) -> RetryResult<T, E> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::RetryResult::{Abort, Retry, Success};
     use rand::Rng;
 
     fn generate_random_number() -> u8 {
@@ -351,7 +355,7 @@ mod tests {
 
         let r = ex.run().await;
 
-        dbg!(r);
+        let _ = dbg!(r);
     }
 
     #[tokio::test]
@@ -367,8 +371,7 @@ mod tests {
         }
 
         async fn example_function(v: u32, s: String) -> RetryResult<String, String> {
-            let mut rng = generate_random_number();
-            println!("RNG: {}", rng);
+            let rng = generate_random_number();
             if rng == 100 {
                 let data_1 = v;
                 let data_2 = s;
