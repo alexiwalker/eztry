@@ -174,6 +174,42 @@ mod tests {
 
     }
 
+
+    #[tokio::test]
+    async fn can_run_prepared_function_on_policy() {
+
+        fn policy() -> RetryPolicy {
+            RetryPolicyBuilder::new()
+                .limit(RetryLimit::Limited(2))
+                .backoff_policy(constant_backoff)
+                .base_delay(15)
+                .build()
+        }
+
+        #[retry_prepare]
+        async fn f(agent:MutableAgent) -> RetryResult<(),()> {
+            let r = agent.execute().await;
+            match r {
+                Ok(_) => {
+                    Success(())
+                }
+                Err(_) => {
+                    Retry(())
+                }
+            }
+        }
+
+
+        let agent = FallibleAgent::mutable(FallibleBehaviour::AlwaysSucceed);
+        let v = f(agent.clone());
+        let res = policy().call(&v).await;
+
+
+        assert!(res.is_ok());
+        assert_eq!(agent.count().await , 1);
+
+    }
+
     fn get_async_demo_agent() -> DemoStructWithAsync {
         FallibleAgent::mutable(FallibleBehaviour::AlwaysSucceed)
     }
