@@ -78,6 +78,102 @@ mod tests {
         assert!(res.is_ok())
     }
 
+
+    #[tokio::test]
+    async fn runs_only_specified_number() {
+
+        fn policy() -> RetryPolicy {
+            RetryPolicyBuilder::new()
+                .limit(RetryLimit::Limited(1))
+                .backoff_policy(constant_backoff)
+                .base_delay(15)
+                .build()
+        }
+
+        #[retry(policy)]
+        async fn f(agent:MutableAgent) -> RetryResult<(),()> {
+            let _ = agent.execute().await;
+            Retry(())
+        }
+
+        let agent = FallibleAgent::mutable(FallibleBehaviour::AlwaysFail);
+
+        let res = f(agent.clone()).await;
+
+        assert!(res.is_err());
+        assert_eq!(agent.count().await , 1);
+
+    }
+
+
+    #[tokio::test]
+    async fn runs_only_specified_number_again() {
+
+        fn policy() -> RetryPolicy {
+            RetryPolicyBuilder::new()
+                .limit(RetryLimit::Limited(100))
+                .backoff_policy(constant_backoff)
+                .base_delay(1)
+                .build()
+        }
+
+        #[retry(policy)]
+        async fn f(agent:MutableAgent) -> RetryResult<(),()> {
+            let r = agent.execute().await;
+            match r {
+                Ok(_) => {
+                    Success(())
+                }
+                Err(_) => {
+                    Retry(())
+                }
+            }
+        }
+
+        let agent = FallibleAgent::mutable(FallibleBehaviour::AlwaysFail);
+
+        let res = f(agent.clone()).await;
+
+        assert!(res.is_err());
+        assert_eq!(agent.count().await , 100);
+
+    }
+
+
+
+    #[tokio::test]
+    async fn wont_run_multiple_times_on_success() {
+
+        fn policy() -> RetryPolicy {
+            RetryPolicyBuilder::new()
+                .limit(RetryLimit::Limited(2))
+                .backoff_policy(constant_backoff)
+                .base_delay(15)
+                .build()
+        }
+
+        #[retry(policy)]
+        async fn f(agent:MutableAgent) -> RetryResult<(),()> {
+            let r = agent.execute().await;
+            match r {
+                Ok(_) => {
+                    Success(())
+                }
+                Err(_) => {
+                    Retry(())
+                }
+            }
+        }
+
+        let agent = FallibleAgent::mutable(FallibleBehaviour::AlwaysSucceed);
+
+        let res = f(agent.clone()).await;
+
+        assert!(res.is_ok());
+        assert_eq!(agent.count().await , 1);
+
+    }
+
     fn get_async_demo_agent() -> DemoStructWithAsync {
         FallibleAgent::mutable(FallibleBehaviour::AlwaysSucceed)
     }

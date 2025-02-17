@@ -3,6 +3,9 @@ use retry_rs_macros::retry;
 use sqlx::{Executor, Pool, Sqlite};
 use std::sync::Arc;
 
+
+
+/// Simulating a Database connection that may be stored on a struct to represent the resources available to an application
 pub struct SqliteDb {
     pool: Arc<Pool<Sqlite>>,
 }
@@ -34,16 +37,16 @@ impl SqliteDb {
             other_value
         );
 
-        let r = sqlx::query("insert into test (id, name) values (random(), ?)")
+        let result = sqlx::query("insert into test (id, name) values (random(), ?)")
             .bind(v)
             .execute(self.pool.as_ref())
             .await;
 
-        let rid = r.unwrap().last_insert_rowid();
+        let row_id = result.unwrap().last_insert_rowid();
 
-        if rid % 15 == 0 {
-            RetryResult::Success(rid.to_string())
-        } else if rid % 100 == 0 {
+        if row_id % 15 == 0 {
+            RetryResult::Success(row_id.to_string())
+        } else if row_id % 100 == 0 {
             RetryResult::Abort(sqlx::Error::RowNotFound)
         } else {
             RetryResult::Retry(sqlx::Error::RowNotFound)

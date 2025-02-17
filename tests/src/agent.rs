@@ -32,6 +32,10 @@ impl MutableAgent {
     pub async fn count(&self) -> u64 {
         self.0.lock().await.count()
     }
+    
+    pub async fn execute(&self) -> FallibleResult {
+        self.0.lock().await.execute_async().await
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -145,6 +149,7 @@ mod test {
             assert!(agent.execute().is_err());
         }
     }
+
 
     #[test]
     pub fn low_chance_of_success() {

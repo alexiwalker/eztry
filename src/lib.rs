@@ -180,7 +180,18 @@ impl<T, E> Retryer<T, E> {
                 RetryResult::Success(v) => return Ok(v),
                 RetryResult::Abort(v) => return Err(v),
                 RetryResult::Retry(e) => {
-                    if self.count > policy.limit {
+
+                    //eg limit(1)
+                    //start at 0 outside loop -> 1 inside loop
+                    // 1>=1 -> true -> retries exhausted -> return Err(e)
+
+                    //as opposed to if it was c>l
+                    //start at 0 outside loop -> 1 inside loop
+                    // 1>1 -> false -> continue
+                    // 2>1 -> true -> retries exhausted -> return Err(e) -> -> ran twice when limit was  1
+
+                    // if self.count > policy.limit {
+                    if self.count >= policy.limit {
                         return Err(e);
                     }
                     policy.wait(self.count).await
@@ -230,10 +241,12 @@ pub fn constant_backoff(policy: &RetryPolicy, _attempt: usize) -> u64 {
 }
 
 impl RetryPolicyBuilder {
+    #[inline]
     pub fn new() -> Self {
         Default::default()
     }
 
+    #[inline]
     pub fn new_with_defaults() -> Self {
         Self {
             limit: Some(Unlimited),
@@ -242,28 +255,33 @@ impl RetryPolicyBuilder {
         }
     }
 
+    #[inline]
     pub fn limit(mut self, limit: RetryLimit) -> Self {
         self.limit = Some(limit);
         self
     }
 
+    #[inline]
     pub fn base_delay(mut self, base_delay: u64) -> Self {
         self.base_delay = Some(base_delay);
         self
     }
 
+    #[inline]
     pub fn backoff_policy(mut self, backoff_policy: fn(&RetryPolicy, usize) -> u64) -> Self {
         self.backoff_policy = Some(backoff_policy);
         self
     }
 
+    #[inline]
     pub fn build(self) -> RetryPolicy {
         RetryPolicy {
-            limit: self.limit.unwrap(),
-            base_delay: self.base_delay.unwrap(),
-            delay_time: self.backoff_policy.unwrap(),
+            limit: self.limit.expect("limit be set before calling build"),
+            base_delay: self.base_delay.expect("base_delay be set before calling build"),
+            delay_time: self.backoff_policy.expect("delay_time be set before calling build"),
         }
     }
+    #[inline]
     pub fn build_with_defaults(self) -> RetryPolicy {
         RetryPolicy {
             limit: self.limit.unwrap_or(Unlimited),
@@ -271,6 +289,7 @@ impl RetryPolicyBuilder {
             delay_time: self.backoff_policy.unwrap_or(default_next_delay),
         }
     }
+    #[inline]
     pub fn try_build(self) -> Result<RetryPolicy, RetryPolicyBuilderError> {
         let mut error = RetryPolicyBuilderError {
             missing_base_delay: false,
@@ -310,12 +329,16 @@ pub struct RetryPolicyBuilderError {
     missing_backoff_policy: bool,
 }
 
+
+#[inline]
 pub fn success<T, E>(v: T) -> RetryResult<T, E> {
     RetryResult::Success(v)
 }
+#[inline]
 pub fn retry<T, E>(e: E) -> RetryResult<T, E> {
     RetryResult::Retry(e)
 }
+#[inline]
 pub fn abort<T, E>(e: E) -> RetryResult<T, E> {
     RetryResult::Abort(e)
 }
@@ -355,6 +378,7 @@ mod tests {
 
         let _ = dbg!(r);
     }
+
 
     #[tokio::test]
     async fn rng_testing() {
