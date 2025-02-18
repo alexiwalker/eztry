@@ -173,6 +173,37 @@ mod tests {
         assert_eq!(agent.count().await , 1);
 
     }
+    // 
+    // 
+    // #[retry_prepare]
+    // pub async fn ref_function<'a>(agent: MutableAgent, some_string:&'a str) -> RetryResult<(), ()> {
+    //     println!("test string: {}", some_string);
+    //     let r = agent.execute().await;
+    //     match r {
+    //         Ok(_) => {
+    //             Success(())
+    //         }
+    //         Err(_) => {
+    //             Retry(())
+    //         }
+    //     }
+    // }
+
+
+
+    #[retry_prepare]
+    pub async fn ref_function(agent: MutableAgent, some_string:&str) -> RetryResult<(), ()> {
+        println!("test string: {}", some_string);
+        let r = agent.execute().await;
+        match r {
+            Ok(_) => {
+                Success(())
+            }
+            Err(_) => {
+                Retry(())
+            }
+        }
+    }
 
 
     #[tokio::test]
@@ -186,8 +217,11 @@ mod tests {
                 .build()
         }
 
+
+
+        
         #[retry_prepare]
-        async fn f(agent:MutableAgent) -> RetryResult<(),()> {
+        pub async fn f(agent: MutableAgent) -> RetryResult<(), ()> {
             let r = agent.execute().await;
             match r {
                 Ok(_) => {
@@ -199,10 +233,15 @@ mod tests {
             }
         }
 
-
         let agent = FallibleAgent::mutable(FallibleBehaviour::AlwaysSucceed);
         let v = f(agent.clone());
-        let res = policy().call(&v).await;
+        let res = policy().call(v).await;
+        assert!(res.is_ok());
+        assert_eq!(agent.count().await , 1);
+        let agent = FallibleAgent::mutable(FallibleBehaviour::AlwaysSucceed);
+        let some_str = "hello";
+        let v = ref_function(agent.clone(), some_str);
+        let res = policy().call(v).await;
 
 
         assert!(res.is_ok());

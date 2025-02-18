@@ -1,7 +1,6 @@
 use crate::RetryLimit::{Limited, Unlimited};
 use async_trait::async_trait;
 use std::cmp::Ordering;
-use std::sync::Arc;
 
 const DEFAULT_POLICY: RetryPolicy = RetryPolicy {
     limit: Unlimited,
@@ -12,7 +11,7 @@ const DEFAULT_POLICY: RetryPolicy = RetryPolicy {
 pub trait Executor<T, E>: Send + Sync {
     async fn execute(&self) -> RetryResult<T, E>;
 
-    fn default_retry_policy<'a>(&'a self) -> Retryer<'a,  T, E>
+    fn default_retry_policy(&self) -> Retryer<T, E>
     where
         Self: Sized
     {
@@ -153,7 +152,7 @@ impl OwnedOrRef<'_, RetryPolicy> {
     pub fn as_ref(&self) -> &RetryPolicy {
         match self {
             OwnedOrRef::Owned(p) => p,
-            OwnedOrRef::Ref(p) => *p,
+            OwnedOrRef::Ref(p) => p,
         }
     }
 }
@@ -176,11 +175,12 @@ impl RetryPolicy {
     }
 
 
-    pub async fn call<'a, T, E >(&'a self, executor: &dyn Executor<T, E>) -> Result<T, E> {
+    /// Runs a function against the given policy
+    pub async fn call<'a, F, T, E >(&'a self, executor: F) -> Result<T, E> where F: Executor<T, E> + 'a {
         Retryer {
-            policy: OwnedOrRef::Ref(&self),
+            policy: OwnedOrRef::Ref(self), /* Ref here to avoid consuming a policy we may want to use repeatedly */
             count: 0,
-            function: Box::new(executor),
+            function: Box::new(&executor),
         }.run().await
     }
 }
@@ -190,12 +190,12 @@ fn default_next_delay(policy: &RetryPolicy, _count: usize) -> u64 {
 }
 
 pub struct Retryer<'a, T, E> {
-    pub policy: OwnedOrRef<'a, RetryPolicy>,
+    policy: OwnedOrRef<'a, RetryPolicy>,
     count: usize, /* not pub, meant to be internal only */
-    pub function: AsyncFunction<'a, T, E>,
+    function: AsyncFunction<'a, T, E>,
 }
 
-impl<'a, T, E> Retryer<'_, T, E> {
+impl<T, E> Retryer<'_, T, E> {
     pub async fn run(mut self) -> Result<T, E> {
         let f = &self.function;
         let policy = self.policy.as_ref();
@@ -413,8 +413,8 @@ mod tests {
         #[async_trait]
         impl Executor<String, String> for PreparedExampleFunction {
             async fn execute(&self) -> RetryResult<String, String> {
-                let (_0, _1) = (self.0.clone(), self.1.clone());
-                example_function(_0, _1).await
+                let (arg0, arg1) = (self.0, self.1.clone());
+                example_function(arg0, arg1).await
             }
         }
 
@@ -445,6 +445,13 @@ mod tests {
 
         let r = ex.run().await;
 
-        dbg!(r);
+        match r {
+            Ok(v) => {
+                println!("Success: {}", v);
+            }
+            Err(e) => {
+                println!("Error: {}", e);
+            }
+        }
     }
 }
