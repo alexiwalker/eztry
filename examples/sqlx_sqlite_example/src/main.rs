@@ -1,9 +1,9 @@
-use retry_rs::*;
 use retry_rs_macros::retry;
 use sqlx::{Executor, Pool, Sqlite};
 use std::sync::Arc;
-
-
+use retry_rs::policy::{RetryPolicy, RetryPolicyBuilder};
+use retry_rs::prelude::RetryLimit;
+use retry_rs::retry_result::RetryResult;
 
 /// Simulating a Database connection that may be stored on a struct to represent the resources available to an application
 pub struct SqliteDb {
@@ -69,7 +69,7 @@ impl AppResources {
 /// A limited attempt retry policy with a constant backoff
 fn policy() -> RetryPolicy {
     RetryPolicyBuilder::new()
-        .backoff_policy(constant_backoff)
+        .backoff_policy(retry_rs::backoff::constant_backoff)
         .base_delay(15)
         .limit(RetryLimit::Limited(10))
         .build()

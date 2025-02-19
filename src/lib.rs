@@ -1,370 +1,80 @@
-use crate::RetryLimit::{Limited, Unlimited};
-use async_trait::async_trait;
-use std::cmp::Ordering;
+pub use async_trait::async_trait;
+pub use executor::Executor;
+pub use policy::RetryPolicy;
+pub use retry_result::RetryResult;
 
-const DEFAULT_POLICY: RetryPolicy = RetryPolicy {
-    limit: Unlimited,
-    base_delay: 1000,
-    delay_time: default_next_delay,
-};
-#[async_trait]
-pub trait Executor<T, E>: Send + Sync {
-    async fn execute(&self) -> RetryResult<T, E>;
+#[cfg(feature = "macros")]
+extern crate retry_rs_macros;
 
-    fn default_retry_policy(&self) -> Retryer<T, E>
-    where
-        Self: Sized
-    {
+#[cfg(feature = "macros")]
+pub use retry_rs_macros::*;
+pub mod retry_result;
+pub mod policy;
+pub mod executor;
+pub mod retryer;
 
-        let __self = self as &dyn Executor<T, E>;
-        let b = Box::new(__self);
-        Retryer {
-            policy: OwnedOrRef::Owned(DEFAULT_POLICY),
-            count: 0,
-            function: b
-        }
-    }
 
-    async fn retry_with_policy(&self, policy: RetryPolicy) -> Result<T, E>
-    where
-        Self: Sized + 'static,
-        T: Send + Sync,
-        E: Send + Sync,
-    {
-        Retryer {
-            policy: OwnedOrRef::Owned(policy),
-            count: 0,
-            function: Box::new(self)
-        }
-            .run()
-            .await
-    }
+pub mod prelude {
+    pub use crate::retry_result::{RetryResult,RetryResult::Retry,RetryResult::Abort,RetryResult::Success};
+    pub use crate::{success, abort, retry};
+    pub use crate::policy::{RetryPolicy, RetryLimit, RetryPolicyBuilder, RetryPolicyBuilderError};
+    pub use crate::executor::{Executor,AsyncFunction,self};
+    pub use crate::retryer::Retryer;
+    pub use crate::backoff;
 
-    async fn retry_with_default_policy(&self) -> Result<T, E>
-    where
-        Self: Sized + 'static,
-        T: Send + Sync,
-        E: Send + Sync,
-    {
-        Retryer {
-            policy: OwnedOrRef::Owned(DEFAULT_POLICY),
-            count: 0,
-            function: Box::new(self),
-        }
-            .run()
-            .await
-    }
-
-    async fn call(self) -> RetryResult<T, E>
-    where
-        Self: Sized + 'static,
-    {
-        self.execute().await
-    }
-
-    fn use_policy(&self, policy: RetryPolicy) -> Retryer<T, E>
-    where
-        Self: Sized + 'static,
-    {
-        Retryer {
-            policy: OwnedOrRef::Owned(policy),
-            count: 0,
-            function: Box::new(self),
-        }
-    }
+    #[cfg(feature = "macros")]
+    pub use retry_rs_macros::*;
 }
 
-pub type AsyncFunction<'a, T, E> = Box<&'a dyn Executor<T, E>>;
 
-#[derive(Debug)]
-pub enum RetryResult<T, E> {
-    Success(T),
-    Retry(E), /* Propagated only if all retries exhausted*/
-    Abort(E),
-}
+pub(crate) mod util {
+    use crate::policy::RetryPolicy;
 
-impl<T, E> From<RetryResult<T, E>> for Result<T, E> {
-    fn from(r: RetryResult<T, E>) -> Self {
-        match r {
-            RetryResult::Success(t) => Ok(t),
-            RetryResult::Abort(e) | RetryResult::Retry(e) => Err(e),
-        }
-    }
-}
-
-#[derive(Default, Debug)]
-pub enum RetryLimit {
-    #[default]
-    Unlimited,
-    Limited(usize),
-}
-
-impl PartialEq for RetryLimit {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Unlimited, Unlimited) => true,
-            (Limited(a), Limited(b)) => a == b,
-            _ => false,
-        }
-    }
-}
-
-impl PartialEq<usize> for RetryLimit {
-    fn eq(&self, other: &usize) -> bool {
-        match self {
-            Unlimited => false,
-            Limited(a) => a == other,
-        }
-    }
-}
-
-//allow somecount > retrylimit comparison without having to match on the enum
-impl PartialOrd<usize> for RetryLimit {
-    fn partial_cmp(&self, count: &usize) -> Option<Ordering> {
-        match self {
-            Unlimited => Some(Ordering::Less),
-            Limited(lim) => match count.cmp(lim) {
-                Ordering::Less => Some(Ordering::Less),
-                Ordering::Equal => Some(Ordering::Equal),
-                Ordering::Greater => Some(Ordering::Greater),
-            },
-        }
-    }
-}
-impl PartialEq<RetryLimit> for usize {
-    fn eq(&self, other: &RetryLimit) -> bool {
-        other.eq(self)
-    }
-}
-
-impl PartialOrd<RetryLimit> for usize {
-    fn partial_cmp(&self, other: &RetryLimit) -> Option<Ordering> {
-        other.partial_cmp(self)
-    }
-}
-
-pub(crate) enum OwnedOrRef<'a, T> {
+    pub(crate) enum OwnedOrRef<'a, T> {
     Owned(T),
     Ref(&'a T),
 }
 
-impl OwnedOrRef<'_, RetryPolicy> {
-    pub fn as_ref(&self) -> &RetryPolicy {
-        match self {
-            OwnedOrRef::Owned(p) => p,
-            OwnedOrRef::Ref(p) => p,
-        }
-    }
-}
-
-pub struct RetryPolicy {
-    pub limit: RetryLimit,
-    pub base_delay: u64,
-    pub delay_time: fn(&RetryPolicy, usize) -> u64,
-}
-
-impl RetryPolicy {
-    pub async fn wait(&self, count: usize) {
-        let t = (self.delay_time)(self, count);
-        let t = std::time::Duration::from_millis(t);
-        tokio::time::sleep(t).await;
-    }
-
-    pub fn can_retry(&self, count: usize) -> bool {
-        count < self.limit
-    }
-
-
-    /// Runs a function against the given policy
-    pub async fn call<'a, F, T, E >(&'a self, executor: F) -> Result<T, E> where F: Executor<T, E> + 'a {
-        Retryer {
-            policy: OwnedOrRef::Ref(self), /* Ref here to avoid consuming a policy we may want to use repeatedly */
-            count: 0,
-            function: Box::new(&executor),
-        }.run().await
-    }
-}
-
-fn default_next_delay(policy: &RetryPolicy, _count: usize) -> u64 {
-    policy.base_delay
-}
-
-pub struct Retryer<'a, T, E> {
-    policy: OwnedOrRef<'a, RetryPolicy>,
-    count: usize, /* not pub, meant to be internal only */
-    function: AsyncFunction<'a, T, E>,
-}
-
-impl<T, E> Retryer<'_, T, E> {
-    pub async fn run(mut self) -> Result<T, E> {
-        let f = &self.function;
-        let policy = self.policy.as_ref();
-        self.count = 0;
-        loop {
-            self.count += 1;
-            let r = f.execute().await;
-            match r {
-                RetryResult::Success(v) => return Ok(v),
-                RetryResult::Abort(v) => return Err(v),
-                RetryResult::Retry(e) => {
-
-                    //eg limit(1)
-                    //start at 0 outside loop -> 1 inside loop
-                    // 1>=1 -> true -> retries exhausted -> return Err(e)
-
-                    //as opposed to if it was c>l
-                    //start at 0 outside loop -> 1 inside loop
-                    // 1>1 -> false -> continue
-                    // 2>1 -> true -> retries exhausted -> return Err(e) -> -> ran twice when limit was  1
-
-                    if self.count >= policy.limit {
-                        return Err(e);
-                    }
-                    policy.wait(self.count).await
-                }
+    impl OwnedOrRef<'_, RetryPolicy> {
+        pub fn as_ref(&self) -> &RetryPolicy {
+            match self {
+                OwnedOrRef::Owned(p) => p,
+                OwnedOrRef::Ref(p) => p,
             }
         }
     }
 
-    pub fn set_policy(&mut self, policy: RetryPolicy) {
-        self.policy = OwnedOrRef::Owned(policy);
-    }
-    pub fn count(&self) -> usize {
-        self.count
-    }
 }
 
-impl Default for RetryPolicy {
-    fn default() -> Self {
-        RetryPolicy {
-            limit: Default::default(),
-            base_delay: 1000,
-            delay_time: default_next_delay,
-        }
-    }
-}
 
 pub type BackoffPolicy = fn(&RetryPolicy, usize) -> u64;
 
-#[derive(Default, Debug)]
-pub struct RetryPolicyBuilder {
-    limit: Option<RetryLimit>,
-    base_delay: Option<u64>,
-    backoff_policy: Option<BackoffPolicy>,
+pub mod backoff {
+    use crate::policy::RetryPolicy;
+    pub fn exponential_backoff(policy: &RetryPolicy, attempt: usize) -> u64 {
+        let multiplier = 2u64.pow(attempt as u32 - 1);
+        policy.base_delay * multiplier
+    }
+
+    pub fn linear_backoff(policy: &RetryPolicy, attempt: usize) -> u64 {
+        policy.base_delay * attempt as u64
+    }
+
+    pub fn constant_backoff(policy: &RetryPolicy, _attempt: usize) -> u64 {
+        policy.base_delay
+    }
+
 }
 
-pub fn exponential_backoff(policy: &RetryPolicy, attempt: usize) -> u64 {
-    let multiplier = 2u64.pow(attempt as u32 - 1);
-    policy.base_delay * multiplier
-}
-
-pub fn linear_backoff(policy: &RetryPolicy, attempt: usize) -> u64 {
-    policy.base_delay * attempt as u64
-}
-
-pub fn constant_backoff(policy: &RetryPolicy, _attempt: usize) -> u64 {
-    policy.base_delay
-}
-
-impl RetryPolicyBuilder {
-    #[inline]
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    #[inline]
-    pub fn new_with_defaults() -> Self {
-        Self {
-            limit: Some(Unlimited),
-            base_delay: Some(1000),
-            backoff_policy: Some(default_next_delay),
-        }
-    }
-
-    #[inline]
-    pub fn limit(mut self, limit: RetryLimit) -> Self {
-        self.limit = Some(limit);
-        self
-    }
-
-    #[inline]
-    pub fn base_delay(mut self, base_delay: u64) -> Self {
-        self.base_delay = Some(base_delay);
-        self
-    }
-
-    #[inline]
-    pub fn backoff_policy(mut self, backoff_policy: fn(&RetryPolicy, usize) -> u64) -> Self {
-        self.backoff_policy = Some(backoff_policy);
-        self
-    }
-
-    #[inline]
-    pub fn build(self) -> RetryPolicy {
-        RetryPolicy {
-            limit: self.limit.expect("limit be set before calling build"),
-            base_delay: self.base_delay.expect("base_delay be set before calling build"),
-            delay_time: self.backoff_policy.expect("delay_time be set before calling build"),
-        }
-    }
-    #[inline]
-    pub fn build_with_defaults(self) -> RetryPolicy {
-        RetryPolicy {
-            limit: self.limit.unwrap_or(Unlimited),
-            base_delay: self.base_delay.unwrap_or(1000),
-            delay_time: self.backoff_policy.unwrap_or(default_next_delay),
-        }
-    }
-    #[inline]
-    pub fn try_build(self) -> Result<RetryPolicy, RetryPolicyBuilderError> {
-        let mut error = RetryPolicyBuilderError {
-            missing_base_delay: false,
-            missing_backoff_policy: false,
-            missing_limit: false,
-        };
-
-        let mut missing_any = false;
-        if self.limit.is_none() {
-            error.missing_limit = true;
-            missing_any = true;
-        }
-        if self.base_delay.is_none() {
-            error.missing_base_delay = true;
-            missing_any = true;
-        }
-        if self.backoff_policy.is_none() {
-            error.missing_backoff_policy = true;
-            missing_any = true;
-        }
-
-        if missing_any {
-            return Err(error);
-        }
-
-        Ok(RetryPolicy {
-            limit: self.limit.unwrap(),
-            base_delay: self.base_delay.unwrap(),
-            delay_time: self.backoff_policy.unwrap(),
-        })
-    }
-}
-
-pub struct RetryPolicyBuilderError {
-    missing_limit: bool,
-    missing_base_delay: bool,
-    missing_backoff_policy: bool,
-}
-
-
-#[inline]
+#[inline(always)]
 pub fn success<T, E>(v: T) -> RetryResult<T, E> {
     RetryResult::Success(v)
 }
-#[inline]
+#[inline(always)]
 pub fn retry<T, E>(e: E) -> RetryResult<T, E> {
     RetryResult::Retry(e)
 }
-#[inline]
+#[inline(always)]
 pub fn abort<T, E>(e: E) -> RetryResult<T, E> {
     RetryResult::Abort(e)
 }
@@ -373,6 +83,8 @@ pub fn abort<T, E>(e: E) -> RetryResult<T, E> {
 mod tests {
     use super::*;
     use rand::Rng;
+    use executor::Executor;
+    use crate::policy::default_next_delay;
 
     fn generate_random_number() -> u8 {
         let mut rng = rand::rng();

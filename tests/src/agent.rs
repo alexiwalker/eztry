@@ -1,5 +1,7 @@
 use rand::Rng;
 use std::sync::Arc;
+
+
 #[derive(Clone, Debug)]
 
 pub(crate) struct FallibleAgent {
@@ -32,7 +34,7 @@ impl MutableAgent {
     pub async fn count(&self) -> u64 {
         self.0.lock().await.count()
     }
-    
+
     pub async fn execute(&self) -> FallibleResult {
         self.0.lock().await.execute_async().await
     }
@@ -113,7 +115,7 @@ impl FallibleAgent {
     }
 }
 
-// #[cfg(test)]
+#[cfg(test)]
 mod test {
     use crate::agent::{FallibleAgent, FallibleBehaviour};
 
@@ -149,7 +151,6 @@ mod test {
             assert!(agent.execute().is_err());
         }
     }
-
 
     #[test]
     pub fn low_chance_of_success() {

@@ -1,10 +1,9 @@
+#[cfg(test)]
 mod agent;
-
+#[cfg(test)]
 mod tests {
     use crate::agent::*;
-    use retry_rs::RetryResult::{Abort, Retry, Success};
-    use retry_rs::*;
-    use retry_rs_macros::*;
+    use retry_rs::prelude::*;
 
     type DemoStructWithAsync = MutableAgent;
     /*the function here should always pass, its to make sure that what I am passing can be passed to async functions*/
@@ -16,7 +15,7 @@ mod tests {
     fn retry_5_times() -> RetryPolicy {
         RetryPolicyBuilder::new()
             .limit(RetryLimit::Limited(5))
-            .backoff_policy(linear_backoff)
+            .backoff_policy(backoff::linear_backoff)
             .base_delay(100)
             .build_with_defaults()
     }
@@ -85,7 +84,7 @@ mod tests {
         fn policy() -> RetryPolicy {
             RetryPolicyBuilder::new()
                 .limit(RetryLimit::Limited(1))
-                .backoff_policy(constant_backoff)
+                .backoff_policy(backoff::constant_backoff)
                 .base_delay(15)
                 .build()
         }
@@ -112,7 +111,7 @@ mod tests {
         fn policy() -> RetryPolicy {
             RetryPolicyBuilder::new()
                 .limit(RetryLimit::Limited(100))
-                .backoff_policy(constant_backoff)
+                .backoff_policy(backoff::constant_backoff)
                 .base_delay(1)
                 .build()
         }
@@ -147,7 +146,7 @@ mod tests {
         fn policy() -> RetryPolicy {
             RetryPolicyBuilder::new()
                 .limit(RetryLimit::Limited(2))
-                .backoff_policy(constant_backoff)
+                .backoff_policy(backoff::constant_backoff)
                 .base_delay(15)
                 .build()
         }
@@ -173,23 +172,6 @@ mod tests {
         assert_eq!(agent.count().await , 1);
 
     }
-    // 
-    // 
-    // #[retry_prepare]
-    // pub async fn ref_function<'a>(agent: MutableAgent, some_string:&'a str) -> RetryResult<(), ()> {
-    //     println!("test string: {}", some_string);
-    //     let r = agent.execute().await;
-    //     match r {
-    //         Ok(_) => {
-    //             Success(())
-    //         }
-    //         Err(_) => {
-    //             Retry(())
-    //         }
-    //     }
-    // }
-
-
 
     #[retry_prepare]
     pub async fn ref_function(agent: MutableAgent, some_string:&str) -> RetryResult<(), ()> {
@@ -210,18 +192,27 @@ mod tests {
     async fn can_run_prepared_function_on_policy() {
 
         fn policy() -> RetryPolicy {
-            RetryPolicyBuilder::new()
+            RetryPolicy::builder()
                 .limit(RetryLimit::Limited(2))
-                .backoff_policy(constant_backoff)
+                .backoff_policy(backoff::constant_backoff)
                 .base_delay(15)
                 .build()
         }
 
-
-
-        
         #[retry_prepare]
         pub async fn f(agent: MutableAgent) -> RetryResult<(), ()> {
+            let r = agent.execute().await;
+            match r {
+                Ok(_) => {
+                    Success(())
+                }
+                Err(_) => {
+                    Retry(())
+                }
+            }
+        }
+        #[retry]
+        pub async fn f3(agent: MutableAgent) -> RetryResult<(), ()> {
             let r = agent.execute().await;
             match r {
                 Ok(_) => {
@@ -246,6 +237,9 @@ mod tests {
 
         assert!(res.is_ok());
         assert_eq!(agent.count().await , 1);
+
+
+        let _ = f3(agent.clone()).await;
 
     }
 
