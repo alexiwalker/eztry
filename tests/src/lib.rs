@@ -4,6 +4,7 @@ mod agent;
 mod tests {
     use crate::agent::*;
     use retry_rs::prelude::*;
+    use retry_rs::async_trait;
 
     type DemoStructWithAsync = MutableAgent;
     /*the function here should always pass, its to make sure that what I am passing can be passed to async functions*/

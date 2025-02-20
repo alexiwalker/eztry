@@ -24,6 +24,9 @@ pub mod prelude {
 
     #[cfg(feature = "macros")]
     pub use retry_rs_macros::*;
+
+    #[cfg(feature = "macros")]
+    pub use crate::async_trait;
 }
 
 
