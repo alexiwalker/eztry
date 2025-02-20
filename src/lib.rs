@@ -1,4 +1,5 @@
-pub use async_trait::async_trait;
+pub use async_trait::async_trait as __async_trait_reexport;
+use async_trait::async_trait;
 pub use executor::Executor;
 pub use policy::RetryPolicy;
 pub use retry_result::RetryResult;
@@ -26,7 +27,7 @@ pub mod prelude {
     pub use retry_rs_macros::*;
 
     #[cfg(feature = "macros")]
-    pub use crate::async_trait;
+    pub use crate::__async_trait_reexport;
 }
 
 

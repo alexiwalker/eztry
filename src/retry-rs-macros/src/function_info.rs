@@ -178,7 +178,7 @@ impl FunctionInfo {
         let expanded = quote! {
             #[allow(non_camel_case_types)]
             struct #struct_name #lifetimes (#struct_fields);
-            #[async_trait]
+            #[__async_trait_reexport]
             impl retry_rs::prelude::Executor<#ret_type_t, #ret_type_e> for #struct_name #anon_lifetime {
                 async fn execute( &self  ) -> #output
                 {
@@ -275,7 +275,7 @@ impl FunctionInfo {
                     struct __inner__struct(#struct_fields);
                     async fn  __inner__(#inputs) -> RetryResult<#ret_type_t, #ret_type_e> #body
 
-                    #[async_trait]
+                    #[__async_trait_reexport]
                     impl retry_rs::prelude::Executor<#ret_type_t, #ret_type_e> for __inner__struct {
                        async fn execute( & self) -> RetryResult<#ret_type_t, #ret_type_e>
                         {
