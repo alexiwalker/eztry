@@ -5,6 +5,9 @@ pub enum RetryResult<T, E> {
     Abort(E),
 }
 
+unsafe impl<T,E> Send for RetryResult<T,E> {}
+unsafe impl<T,E> Sync for RetryResult<T,E> {}
+
 impl<T, E> From<RetryResult<T, E>> for Result<T, E> {
     fn from(r: RetryResult<T, E>) -> Self {
         match r {

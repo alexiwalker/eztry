@@ -71,4 +71,5 @@ pub trait Executor<T, E>: Send + Sync {
     }
 }
 
+
 pub type AsyncFunction<'a, T, E> = Box<&'a dyn Executor<T, E>>;

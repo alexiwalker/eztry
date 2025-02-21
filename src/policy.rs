@@ -1,7 +1,8 @@
 use std::cmp::Ordering;
-use crate::{policy, BackoffPolicy};
+use std::fmt::Debug;
+use crate::{policy, BackoffPolicy, RetryResult};
 use crate::executor::Executor;
-use crate::retryer::Retryer;
+use crate::retryer::{ExecutableType, Retryer};
 
 pub const DEFAULT_POLICY: RetryPolicy = RetryPolicy {
     limit: RetryLimit::Unlimited,
@@ -93,7 +94,28 @@ impl RetryPolicy {
     pub fn builder() -> RetryPolicyBuilder {
         RetryPolicyBuilder::new()
     }
+
+    pub async fn retry_function<'a, T:Send+Sync,E:Send+Sync>(&'a self, f: impl AsyncFn() -> RetryResult<T,E> + Send + Sync ) -> Result<T,E>  where T: Debug, E:Debug{
+
+        //todo this is a placeholder while i test lifetime stuff
+
+        loop {
+            let r = f().await;
+
+            dbg!(&r);
+
+
+            match r {
+                RetryResult::Success(v) =>  return Ok(v),
+                RetryResult::Abort(v) =>  return Err(v),
+                RetryResult::Retry(_) => {}
+            }
+        }
+
+    }
+
 }
+
 
 pub fn default_next_delay(policy: &RetryPolicy, _count: usize) -> u64 {
     policy.base_delay
@@ -128,7 +150,7 @@ impl RetryPolicyBuilder {
         Self {
             limit: Some(RetryLimit::Unlimited),
             base_delay: Some(1000),
-            backoff_policy: Some(policy::default_next_delay),
+            backoff_policy: Some(default_next_delay),
         }
     }
 
@@ -163,7 +185,7 @@ impl RetryPolicyBuilder {
         RetryPolicy {
             limit: self.limit.unwrap_or(RetryLimit::Unlimited),
             base_delay: self.base_delay.unwrap_or(1000),
-            delay_time: self.backoff_policy.unwrap_or(policy::default_next_delay),
+            delay_time: self.backoff_policy.unwrap_or(default_next_delay),
         }
     }
     #[inline]

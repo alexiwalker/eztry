@@ -1,7 +1,12 @@
 use crate::executor::{AsyncFunction};
 use crate::policy::RetryPolicy;
 use crate::retry_result::RetryResult;
-use crate::util;
+use crate::{util, Executor};
+
+pub(crate) enum ExecutableType<'a, T,E, X:AsyncFn() -> RetryResult<T,E>> {
+    StructFunction( Box<&'a dyn Executor<T, E>>),
+    FunctionPointer(  X  )
+}
 
 pub struct Retryer<'a, T, E> {
     pub(crate) policy: util::OwnedOrRef<'a, RetryPolicy>,

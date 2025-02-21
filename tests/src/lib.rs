@@ -247,3 +247,112 @@ mod tests {
         FallibleAgent::mutable(FallibleBehaviour::AlwaysSucceed)
     }
 }
+
+
+
+#[cfg(test)]
+mod tests2 {
+    use std::future::Future;
+    use std::pin::Pin;
+    use retry_rs::prelude::*;
+    use crate::agent::{FallibleResult, MutableAgent, SignalValue};
+
+    #[tokio::test]
+    async fn async_closure_testing(){
+
+        use core::future::Future;
+        // async fn f<Fut>(_: impl for<'a> Fn(&'a u8) -> Fut)
+        // where
+        //     Fut: Future<Output = ()>,
+        // { todo!() }
+        //
+        // async fn f2(f: impl AsyncFn(MutableAgent) -> RetryResult<(), ()>) {
+        //     let agent = crate::agent::FallibleAgent::mutable(crate::agent::FallibleBehaviour::SucceedAfter(15));
+        //         let r = f(agent).await;
+        //
+        //
+        //
+        //     dbg!(r);
+        //
+        //
+        // }
+        // async fn f3(f: impl AsyncFn() -> RetryResult<(), ()>) {
+        //
+        //     loop {
+        //         let r = f().await;
+        //         match r {
+        //             RetryResult::Success(V) => {
+        //             return;
+        //         },
+        //             RetryResult::Abort(_) => {
+        //                 return;
+        //             }
+        //             RetryResult::Retry(_) => {
+        //                 continue;
+        //
+        //         }
+        //     }
+        //     }
+        //
+        // }
+        //
+        //     async fn g(agent: MutableAgent) -> RetryResult<(), ()> {
+        //         match agent.execute().await {
+        //             Ok(v) => {
+        //                 Success(())
+        //             }
+        //             Err(e) => {
+        //                 Retry(())
+        //             }
+        //         }
+        //     }
+        //     // f(g).await;/
+        //     //~^ ERROR mismatched types
+        //     //~| ERROR one type is more general than the other
+        //
+        //     f2(g).await; // ok!
+        //
+        //
+        //
+        // let agent_for_closure = crate::agent::FallibleAgent::mutable(crate::agent::FallibleBehaviour::SucceedAfter(15));
+        // f3(|| async  {
+        //     match agent_for_closure.execute().await {
+        //         Ok(v) => {
+        //             Success(())
+        //         }
+        //         Err(e) => {
+        //             Retry(())
+        //         }
+        //     }
+        // }).await;
+        //
+        // let agent_count = agent_for_closure.count().await;
+        //
+        // dbg!(agent_count);
+
+        //retry_function
+        let policy = RetryPolicy::builder()
+            .limit(RetryLimit::Limited(20))
+            .backoff_policy(backoff::constant_backoff)
+            .base_delay(15)
+            .build();
+
+        let agent = crate::agent::FallibleAgent::mutable(crate::agent::FallibleBehaviour::SucceedAfter(15));
+
+        let res = policy.retry_function(||async {
+            match agent.execute().await {
+                Ok(v) => {
+                    Success(())
+                }
+                Err(e) => {
+                    Retry(())
+                }
+            }
+        }).await;
+
+
+        dbg!(&res);
+
+
+    }
+}
