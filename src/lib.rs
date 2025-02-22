@@ -1,5 +1,4 @@
 pub use async_trait::async_trait as __async_trait_reexport;
-use async_trait::async_trait;
 pub use executor::Executor;
 pub use policy::RetryPolicy;
 pub use retry_result::RetryResult;
@@ -9,6 +8,7 @@ extern crate retry_rs_macros;
 
 #[cfg(feature = "macros")]
 pub use retry_rs_macros::*;
+
 pub mod retry_result;
 pub mod policy;
 pub mod executor;
@@ -85,6 +85,7 @@ pub fn abort<T, E>(e: E) -> RetryResult<T, E> {
 
 #[cfg(test)]
 mod tests {
+    use async_trait::async_trait;
     use super::*;
     use rand::Rng;
     use executor::Executor;

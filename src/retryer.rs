@@ -1,8 +1,7 @@
 use crate::policy::RetryPolicy;
 use crate::prelude::AsyncFunction;
 use crate::retry_result::RetryResult;
-use crate::{util, Executor};
-use std::fmt::Debug;
+use crate::{util};
 
 
 pub struct BoxRetryer<'a, T, E> {
@@ -18,8 +17,7 @@ impl<T, E> BoxRetryer<'_, T, E> {
         self.count = 0;
         loop {
             self.count += 1;
-            let r = f.execute().await;
-            match r {
+            match f.execute().await {
                 RetryResult::Success(v) => return Ok(v),
                 RetryResult::Abort(v) => return Err(v),
                 RetryResult::Retry(e) => {
@@ -54,8 +52,7 @@ impl<T, E, F> ClosureRetryer<'_, T, E, F> where F: AsyncFn() -> RetryResult<T, E
         self.count = 0;
         loop {
             self.count += 1;
-            let r = f().await;
-            match r {
+            match f().await {
                 RetryResult::Success(v) => return Ok(v),
                 RetryResult::Abort(v) => return Err(v),
                 RetryResult::Retry(e) => {
