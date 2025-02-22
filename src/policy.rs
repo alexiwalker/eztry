@@ -3,16 +3,16 @@ use crate::retryer::{BoxRetryer, ClosureRetryer};
 use crate::{BackoffPolicy, RetryResult};
 use std::cmp::Ordering;
 use std::fmt::Debug;
+use crate::backoff::*;
 
 pub const DEFAULT_POLICY: RetryPolicy = RetryPolicy {
     limit: RetryLimit::Unlimited,
     base_delay: 1000,
-    delay_time: default_next_delay,
+    delay_time: constant_backoff,
 };
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub enum RetryLimit {
-    #[default]
     Unlimited,
     Limited(usize),
 }
@@ -111,19 +111,7 @@ impl RetryPolicy {
 
 }
 
-pub fn default_next_delay(policy: &RetryPolicy, _count: usize) -> u64 {
-    policy.base_delay
-}
 
-impl Default for RetryPolicy {
-    fn default() -> Self {
-        RetryPolicy {
-            limit: Default::default(),
-            base_delay: 1000,
-            delay_time: default_next_delay,
-        }
-    }
-}
 
 #[derive(Default, Debug)]
 pub struct RetryPolicyBuilder {
@@ -143,7 +131,7 @@ impl RetryPolicyBuilder {
         Self {
             limit: Some(RetryLimit::Unlimited),
             base_delay: Some(1000),
-            backoff_policy: Some(default_next_delay),
+            backoff_policy: Some(constant_backoff),
         }
     }
 
@@ -182,7 +170,7 @@ impl RetryPolicyBuilder {
         RetryPolicy {
             limit: self.limit.unwrap_or(RetryLimit::Unlimited),
             base_delay: self.base_delay.unwrap_or(1000),
-            delay_time: self.backoff_policy.unwrap_or(default_next_delay),
+            delay_time: self.backoff_policy.unwrap_or(constant_backoff),
         }
     }
     #[inline]

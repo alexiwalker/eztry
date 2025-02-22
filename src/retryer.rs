@@ -11,7 +11,7 @@ pub struct BoxRetryer<'a, T, E> {
 }
 
 impl<T, E> BoxRetryer<'_, T, E> {
-    pub async fn run(mut self) -> Result<T, E> {
+    pub async fn run(&mut self) -> Result<T, E> {
         let f = &self.function;
         let policy = self.policy.as_ref();
         self.count = 0;

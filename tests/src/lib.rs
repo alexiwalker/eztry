@@ -2,9 +2,10 @@
 mod agent;
 #[cfg(test)]
 mod tests {
-    use retry_rs::policy::Retryable;
+    use rand::Rng;
     use crate::agent::*;
     use retry_rs::prelude::*;
+    
 
     type DemoStructWithAsync = MutableAgent;
     /*the function here should always pass, its to make sure that what I am passing can be passed to async functions*/
@@ -16,7 +17,7 @@ mod tests {
     fn retry_5_times() -> RetryPolicy {
         RetryPolicyBuilder::new()
             .limit(RetryLimit::Limited(5))
-            .backoff_policy(backoff::linear_backoff)
+            .backoff_policy(linear_backoff)
             .base_delay(100)
             .build_with_defaults()
     }
@@ -85,7 +86,7 @@ mod tests {
         fn policy() -> RetryPolicy {
             RetryPolicyBuilder::new()
                 .limit(RetryLimit::Limited(1))
-                .backoff_policy(backoff::constant_backoff)
+                .backoff_policy(constant_backoff)
                 .base_delay(15)
                 .build()
         }
@@ -112,7 +113,7 @@ mod tests {
         fn policy() -> RetryPolicy {
             RetryPolicyBuilder::new()
                 .limit(RetryLimit::Limited(100))
-                .backoff_policy(backoff::constant_backoff)
+                .backoff_policy(constant_backoff)
                 .base_delay(1)
                 .build()
         }
@@ -147,7 +148,7 @@ mod tests {
         fn policy() -> RetryPolicy {
             RetryPolicyBuilder::new()
                 .limit(RetryLimit::Limited(2))
-                .backoff_policy(backoff::constant_backoff)
+                .backoff_policy(constant_backoff)
                 .base_delay(15)
                 .build()
         }
@@ -175,8 +176,7 @@ mod tests {
     }
 
     #[retry_prepare]
-    pub async fn ref_function(agent: MutableAgent, some_string:&str) -> RetryResult<(), ()> {
-        println!("test string: {}", some_string);
+    pub async fn ref_function(agent: MutableAgent, _:&str) -> RetryResult<(), ()> {
         let r = agent.execute().await;
         match r {
             Ok(_) => {
@@ -195,7 +195,7 @@ mod tests {
         fn policy() -> RetryPolicy {
             RetryPolicy::builder()
                 .limit(RetryLimit::Limited(2))
-                .backoff_policy(backoff::constant_backoff)
+                .backoff_policy(constant_backoff)
                 .base_delay(15)
                 .build()
         }
@@ -258,7 +258,7 @@ mod tests {
         //retry_function
         let policy = RetryPolicy::builder()
             .limit(RetryLimit::Limited(20))
-            .backoff_policy(backoff::constant_backoff)
+            .backoff_policy(constant_backoff)
             .base_delay(15)
             .build();
 
@@ -290,7 +290,7 @@ mod tests {
         //retry_function
         let policy = RetryPolicy::builder()
             .limit(RetryLimit::Limited(20))
-            .backoff_policy(backoff::constant_backoff)
+            .backoff_policy(constant_backoff)
             .base_delay(15)
             .build();
 
@@ -312,5 +312,74 @@ mod tests {
         assert!(res.is_ok());
         assert_eq!(count, 15);
 
+    }
+
+
+    fn generate_random_number() -> u8 {
+        let mut rng = rand::rng();
+        rng.random_range(1..=100)
+    }
+    
+    
+    const INTERMITTENT_ERROR: &str = "intermittent error";
+    const SIMULATED_ERROR: &str = "simulated error";
+    
+    const INPUT_STR: &str = "test string";
+    
+    #[tokio::test]
+    async fn rng_testing() {
+        struct PreparedExampleFunction(u32, String);
+
+        #[async_trait]
+        impl Executor<String, String> for PreparedExampleFunction {
+            async fn execute(&self) -> RetryResult<String, String> {
+                let (arg0, arg1) = (self.0, self.1.clone());
+                example_function(arg0, arg1).await
+            }
+        }
+
+        async fn example_function(v: u32, s: String) -> RetryResult<String, String> {
+            let rng = generate_random_number();
+            if rng == 100 {
+                let data_1 = v;
+                let data_2 = s;
+                let s = format!("{data_1}_{data_2}");
+                success(s)
+            } else if rng < 5 {
+                abort(SIMULATED_ERROR.to_string())
+            } else {
+                retry(INTERMITTENT_ERROR.to_string())
+            }
+        }
+
+        let func = PreparedExampleFunction(1u32, INPUT_STR.to_string());
+        let mut ex = func.default_retry_policy();
+
+        let p = RetryPolicy {
+            limit: RetryLimit::Limited(10),
+            base_delay: 500,
+            delay_time: constant_backoff,
+        };
+
+        ex.set_policy(p);
+
+        let r = ex.run().await;
+
+        match r {
+            Ok(v) => {
+                assert_eq!(v,  format!("1_{INPUT_STR}"));
+                println!("Success: {}", v);
+            }
+            Err(e) => {
+                
+                if e.as_str() == SIMULATED_ERROR {
+                    return;
+                }
+
+                //if we're here on an intermittent error, it means we have exhausted the retries
+                //so c == 10
+                assert_eq!(ex.count(), 10);
+            }
+        }
     }
 }

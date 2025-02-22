@@ -1367,7 +1367,6 @@ name = "sqlx_sqlite_example"
 version = "0.1.0"
 dependencies = [
  "retry-rs",
- "retry-rs-macros",
  "sqlx",
  "tokio",
 ]
