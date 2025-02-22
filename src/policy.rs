@@ -1,15 +1,14 @@
+use crate::executor::Executor;
+use crate::retryer::{BoxRetryer, ClosureRetryer};
+use crate::{BackoffPolicy, RetryResult};
 use std::cmp::Ordering;
 use std::fmt::Debug;
-use crate::{policy, BackoffPolicy, RetryResult};
-use crate::executor::Executor;
-use crate::retryer::{ExecutableType, Retryer};
 
 pub const DEFAULT_POLICY: RetryPolicy = RetryPolicy {
     limit: RetryLimit::Unlimited,
     base_delay: 1000,
     delay_time: default_next_delay,
 };
-
 
 #[derive(Default, Debug)]
 pub enum RetryLimit {
@@ -18,13 +17,11 @@ pub enum RetryLimit {
     Limited(usize),
 }
 
-
 pub struct RetryPolicy {
     pub limit: RetryLimit,
     pub base_delay: u64,
     pub delay_time: fn(&RetryPolicy, usize) -> u64,
 }
-
 
 impl PartialEq for RetryLimit {
     fn eq(&self, other: &Self) -> bool {
@@ -81,41 +78,38 @@ impl RetryPolicy {
         count < self.limit
     }
 
-
     /// Runs a function against the given policy
-    pub async fn call<'a, Func, RetType, ErrType>(&'a self, executor: Func) -> Result<RetType, ErrType> where Func: Executor<RetType, ErrType> + 'a {
-        Retryer {
+    pub async fn call<'a, Func, RetType, ErrType>(
+        &'a self,
+        executor: Func,
+    ) -> Result<RetType, ErrType>
+    where
+        Func: Executor<RetType, ErrType> + 'a,
+    {
+        BoxRetryer {
             policy: crate::util::OwnedOrRef::Ref(self), /* Ref here to avoid consuming a policy we may want to use repeatedly */
             count: 0,
             function: Box::new(&executor),
         }.run().await
     }
-    
+
+    /// Runs a function against the given policy
+    pub async fn call_closure<'a, RetType: Send + Sync, ErrType: Send + Sync>(
+        &'a self,
+        f: impl AsyncFn() -> RetryResult<RetType, ErrType> + Send + Sync,
+    ) -> Result<RetType, ErrType> {
+        ClosureRetryer {
+            policy: crate::util::OwnedOrRef::Ref(self), /* Ref here to avoid consuming a policy we may want to use repeatedly */
+            count: 0,
+            function: f,
+        }.run().await
+    }
+
     pub fn builder() -> RetryPolicyBuilder {
         RetryPolicyBuilder::new()
     }
 
-    pub async fn retry_function<'a, T:Send+Sync,E:Send+Sync>(&'a self, f: impl AsyncFn() -> RetryResult<T,E> + Send + Sync ) -> Result<T,E>  where T: Debug, E:Debug{
-
-        //todo this is a placeholder while i test lifetime stuff
-
-        loop {
-            let r = f().await;
-
-            dbg!(&r);
-
-
-            match r {
-                RetryResult::Success(v) =>  return Ok(v),
-                RetryResult::Abort(v) =>  return Err(v),
-                RetryResult::Retry(_) => {}
-            }
-        }
-
-    }
-
 }
-
 
 pub fn default_next_delay(policy: &RetryPolicy, _count: usize) -> u64 {
     policy.base_delay
@@ -130,7 +124,6 @@ impl Default for RetryPolicy {
         }
     }
 }
-
 
 #[derive(Default, Debug)]
 pub struct RetryPolicyBuilder {
@@ -176,8 +169,12 @@ impl RetryPolicyBuilder {
     pub fn build(self) -> RetryPolicy {
         RetryPolicy {
             limit: self.limit.expect("limit be set before calling build"),
-            base_delay: self.base_delay.expect("base_delay be set before calling build"),
-            delay_time: self.backoff_policy.expect("delay_time be set before calling build"),
+            base_delay: self
+                .base_delay
+                .expect("base_delay be set before calling build"),
+            delay_time: self
+                .backoff_policy
+                .expect("delay_time be set before calling build"),
         }
     }
     #[inline]
@@ -226,4 +223,23 @@ pub struct RetryPolicyBuilderError {
     missing_limit: bool,
     missing_base_delay: bool,
     missing_backoff_policy: bool,
+}
+
+
+ 
+
+pub trait Retryable<RetType, ErrType> {
+    async fn retry(
+        &self,
+        policy: &RetryPolicy,
+    ) -> Result<RetType, ErrType>;
+}
+
+impl<F, T,E> Retryable<T,E> for F where F: AsyncFn() -> RetryResult<T, E> + Send + Sync, T:Send+Sync,E:Send+Sync{
+    async fn retry(
+        &self,
+        policy: &RetryPolicy,
+    ) -> Result<T,E> {
+        policy.call_closure(self).await
+    }
 }

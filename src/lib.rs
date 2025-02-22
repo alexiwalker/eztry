@@ -20,7 +20,7 @@ pub mod prelude {
     pub use crate::{success, abort, retry};
     pub use crate::policy::{RetryPolicy, RetryLimit, RetryPolicyBuilder, RetryPolicyBuilderError};
     pub use crate::executor::{Executor,AsyncFunction,self};
-    pub use crate::retryer::Retryer;
+    pub use crate::retryer::BoxRetryer;
     pub use crate::backoff;
 
     #[cfg(feature = "macros")]

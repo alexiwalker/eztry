@@ -2,20 +2,20 @@ use async_trait::async_trait;
 use crate::retry_result::RetryResult;
 use crate::util;
 use crate::policy::{RetryPolicy, DEFAULT_POLICY};
-use crate::retryer::Retryer;
+use crate::retryer::{BoxRetryer};
 
 #[async_trait]
 pub trait Executor<T, E>: Send + Sync {
     async fn execute(&self) -> RetryResult<T, E>;
 
-    fn default_retry_policy(&self) -> Retryer<T, E>
+    fn default_retry_policy(&self) -> BoxRetryer<T, E>
     where
         Self: Sized
     {
 
         let __self = self as &dyn Executor<T, E>;
         let b = Box::new(__self);
-        Retryer {
+        BoxRetryer {
             policy: util::OwnedOrRef::Owned(DEFAULT_POLICY),
             count: 0,
             function: b
@@ -28,7 +28,7 @@ pub trait Executor<T, E>: Send + Sync {
         T: Send + Sync,
         E: Send + Sync,
     {
-        Retryer {
+        BoxRetryer {
             policy: util::OwnedOrRef::Owned(policy),
             count: 0,
             function: Box::new(self)
@@ -43,7 +43,7 @@ pub trait Executor<T, E>: Send + Sync {
         T: Send + Sync,
         E: Send + Sync,
     {
-        Retryer {
+        BoxRetryer {
             policy: util::OwnedOrRef::Owned(DEFAULT_POLICY),
             count: 0,
             function: Box::new(self),
@@ -59,11 +59,11 @@ pub trait Executor<T, E>: Send + Sync {
         self.execute().await
     }
 
-    fn use_policy(&self, policy: RetryPolicy) -> Retryer<T, E>
+    fn use_policy(&self, policy: RetryPolicy) -> BoxRetryer<T, E>
     where
         Self: Sized + 'static,
     {
-        Retryer {
+        BoxRetryer {
             policy: util::OwnedOrRef::Owned(policy),
             count: 0,
             function: Box::new(self),
