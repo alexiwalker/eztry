@@ -1,9 +1,10 @@
+use crate::backoff::*;
 use crate::executor::Executor;
-use crate::retryer::{BoxRetryer, ClosureRetryer};
+use crate::retryer::{ClosureRetryer, Retryer};
 use crate::{BackoffPolicy, RetryResult};
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::Debug;
-use crate::backoff::*;
 
 pub const DEFAULT_POLICY: RetryPolicy = RetryPolicy {
     limit: RetryLimit::Unlimited,
@@ -11,15 +12,18 @@ pub const DEFAULT_POLICY: RetryPolicy = RetryPolicy {
     delay_time: constant_backoff,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum RetryLimit {
     Unlimited,
     Limited(usize),
 }
 
+#[derive(Debug, Serialize, Clone)]
 pub struct RetryPolicy {
     pub limit: RetryLimit,
     pub base_delay: u64,
+
+    #[serde(skip)]
     pub delay_time: fn(&RetryPolicy, usize) -> u64,
 }
 
@@ -42,7 +46,6 @@ impl PartialEq<usize> for RetryLimit {
     }
 }
 
-//allow somecount > retrylimit comparison without having to match on the enum
 impl PartialOrd<usize> for RetryLimit {
     fn partial_cmp(&self, count: &usize) -> Option<Ordering> {
         match self {
@@ -86,7 +89,7 @@ impl RetryPolicy {
     where
         Func: Executor<RetType, ErrType> + 'a,
     {
-        BoxRetryer {
+        Retryer {
             policy: crate::util::OwnedOrRef::Ref(self), /* Ref here to avoid consuming a policy we may want to use repeatedly */
             count: 0,
             function: Box::new(&executor),
@@ -108,10 +111,7 @@ impl RetryPolicy {
     pub fn builder() -> RetryPolicyBuilder {
         RetryPolicyBuilder::new()
     }
-
 }
-
-
 
 #[derive(Default, Debug)]
 pub struct RetryPolicyBuilder {
@@ -121,11 +121,18 @@ pub struct RetryPolicyBuilder {
 }
 
 impl RetryPolicyBuilder {
+    /// Creates a new RetryPolicyBuilder
+    /// All fields are unset by default
     #[inline]
     pub fn new() -> Self {
         Default::default()
     }
 
+    /// Creates a new RetryPolicyBuilder with default values. Default Values:
+    ///
+    /// - limit: Unlimited
+    /// - base_delay: 1000
+    /// - backoff_policy: constant_backoff
     #[inline]
     pub fn new_with_defaults() -> Self {
         Self {
@@ -135,24 +142,42 @@ impl RetryPolicyBuilder {
         }
     }
 
+    /// Sets the limit for the RetryPolicy.
+    /// Limit is the inclusive upper bound on the number of times a retryable function will be attempted
+    /// before converting the error to a final result
     #[inline]
     pub fn limit(mut self, limit: RetryLimit) -> Self {
         self.limit = Some(limit);
         self
     }
 
+    /// Sets the base delay for the RetryPolicy.
+    /// Base delay is the time (in milliseconds) to wait before retrying a function.
+    /// Does not apply to first attempt.
+    /// Subsequent attempts will have their delay calculated by the backoff_policy
     #[inline]
     pub fn base_delay(mut self, base_delay: u64) -> Self {
         self.base_delay = Some(base_delay);
         self
     }
 
+    /// Sets the backoff policy for the RetryPolicy.
+    /// The backoff policy is a function that takes the RetryPolicy and the current attempt number
+    /// and returns the time (in milliseconds) to wait before retrying the function
+    /// Is called after the previous attempt has failed
     #[inline]
     pub fn backoff_policy(mut self, backoff_policy: fn(&RetryPolicy, usize) -> u64) -> Self {
         self.backoff_policy = Some(backoff_policy);
         self
     }
 
+    /// Builds a RetryPolicy with the given parameters from the builder
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of the required fields are not set. To avoid panics, use
+    /// try_build (returns Result<RetryPolicy, RetryPolicyBuilderError>)
+    /// or build_with_defaults (returns RetryPolicy with default values for unset fields)
     #[inline]
     pub fn build(self) -> RetryPolicy {
         RetryPolicy {
@@ -165,6 +190,15 @@ impl RetryPolicyBuilder {
                 .expect("delay_time be set before calling build"),
         }
     }
+
+    /// Builds a RetryPolicy with the given parameters from the builder.
+    /// If any required fields are not set, the default values will be used.
+    /// Default Values:
+    /// - limit: Unlimited
+    /// - base_delay: 1000
+    /// - backoff_policy: constant_backoff
+    ///
+    /// Unlike build, this method will not panic if any required fields are not set
     #[inline]
     pub fn build_with_defaults(self) -> RetryPolicy {
         RetryPolicy {
@@ -173,6 +207,9 @@ impl RetryPolicyBuilder {
             delay_time: self.backoff_policy.unwrap_or(constant_backoff),
         }
     }
+
+    /// Builds a RetryPolicy with the given parameters from the builder.
+    /// Any missing fields are added to the error returned
     #[inline]
     pub fn try_build(self) -> Result<RetryPolicy, RetryPolicyBuilderError> {
         let mut error = RetryPolicyBuilderError {
@@ -207,27 +244,83 @@ impl RetryPolicyBuilder {
     }
 }
 
+/// Error returned when a RetryPolicyBuilder is missing required fields
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct RetryPolicyBuilderError {
     missing_limit: bool,
     missing_base_delay: bool,
     missing_backoff_policy: bool,
 }
 
+/// Utility trait to make async closures retryable.
+/// This trait is implemented for all async closures that return a RetryResult.
+///
+/// Can be used to retry the closure immediately with a policy or the default policy.
+/// See: retry_rs::policy::DEFAULT_POLICY
+///
 
- 
+pub trait Retryable<T, E> {
+    /// Provided by the retry_rs::Retryable trait, re-exported in prelude
+    /// Allows a policy to be provided directly to a closure to retry it
+    ///
+    /// # Example
+    ///
+    /// ```rust, ignore
+    ///        let policy = RetryPolicy::builder().build_with_defaults();
+    ///        let res = (|| async {
+    ///            match some_async_function().await {
+    ///                Ok(_v) => {
+    ///                    Success(())
+    ///                }
+    ///                Err(_e) => {
+    ///                    Retry(())
+    ///                }
+    ///            }
+    ///        }).retry(&policy).await;
+    /// ```
+    /// # Returns
+    ///
+    /// Result<T,E> compatible with the RetryResult<T,E> returned by the closure
+    ///
+    async fn retry(&self, policy: &RetryPolicy) -> Result<T, E>;
 
-pub trait Retryable<RetType, ErrType> {
-    async fn retry(
-        &self,
-        policy: &RetryPolicy,
-    ) -> Result<RetType, ErrType>;
+    /// Provided by the retry_rs::Retryable trait, re-exported in prelude.
+    /// Retry the closure with the default policy. See: retry_rs::policy::DEFAULT_POLICY
+    ///
+    /// # Example
+    ///
+    /// ```rust, ignore
+    ///        let policy = RetryPolicy::builder().build_with_defaults();
+    ///        let res = (|| async {
+    ///            match some_async_function(execute().await {
+    ///                Ok(_v) => {
+    ///                    Success(())
+    ///                }
+    ///                Err(_e) => {
+    ///                    Retry(())
+    ///                }
+    ///            }
+    ///        }).retry_with_default_policy().await;
+    /// ```
+    /// # Returns
+    ///
+    /// Result<T,E> compatible with the RetryResult<T,E> returned by the closure
+    ///
+    async fn retry_with_default_policy(&self) -> Result<T, E>;
 }
 
-impl<F, T,E> Retryable<T,E> for F where F: AsyncFn() -> RetryResult<T, E> + Send + Sync, T:Send+Sync,E:Send+Sync{
-    async fn retry(
-        &self,
-        policy: &RetryPolicy,
-    ) -> Result<T,E> {
+impl<F, T, E> Retryable<T, E> for F
+where
+    F: AsyncFn() -> RetryResult<T, E> + Send + Sync,
+    T: Send + Sync,
+    E: Send + Sync,
+{
+    async fn retry(&self, policy: &RetryPolicy) -> Result<T, E> {
+        policy.call_closure(self).await
+    }
+
+    async fn retry_with_default_policy(&self) -> Result<T, E> {
+        let policy = DEFAULT_POLICY;
         policy.call_closure(self).await
     }
 }

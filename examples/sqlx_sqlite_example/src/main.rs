@@ -1,7 +1,6 @@
+use retry_rs::prelude::*;
 use sqlx::{Executor, Pool, Sqlite};
 use std::sync::Arc;
-use retry_rs::prelude::*;
-use retry_rs::macros::*;
 
 /// Simulating a Database connection that may be stored on a struct to represent the resources available to an application
 pub struct SqliteDb {
@@ -28,13 +27,8 @@ impl SqliteDb {
     pub async fn execute_test_query(
         &self,
         v: String,
-        other_value: &'_ str,
+        _other_value: &'_ str,
     ) -> RetryResult<String, sqlx::Error> {
-        println!(
-            "executing the test query with a passed reference value with a lifetime: {}",
-            other_value
-        );
-
         let result = sqlx::query("insert into test (id, name) values (random(), ?)")
             .bind(v)
             .execute(self.pool.as_ref())
@@ -42,12 +36,14 @@ impl SqliteDb {
 
         let row_id = result.unwrap().last_insert_rowid();
 
+        let res_str = format!("Row ID: {row_id}, input:{_other_value}");
+
         if row_id % 15 == 0 {
-            RetryResult::Success(row_id.to_string())
+            Success(res_str)
         } else if row_id % 100 == 0 {
-            RetryResult::Abort(sqlx::Error::RowNotFound)
+            Abort(sqlx::Error::RowNotFound)
         } else {
-            RetryResult::Retry(sqlx::Error::RowNotFound)
+            Retry(sqlx::Error::RowNotFound)
         }
     }
 }

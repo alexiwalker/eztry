@@ -1,75 +1,69 @@
-use async_trait::async_trait;
-use crate::retry_result::RetryResult;
-use crate::util;
 use crate::policy::{RetryPolicy, DEFAULT_POLICY};
-use crate::retryer::{BoxRetryer};
+use crate::retry_result::RetryResult;
+use crate::retryer::Retryer;
+use crate::util;
+use async_trait::async_trait;
 
 #[async_trait]
 pub trait Executor<T, E>: Send + Sync {
     async fn execute(&self) -> RetryResult<T, E>;
 
-    fn default_retry_policy(&self) -> BoxRetryer<T, E>
+    /// Prepare the executor to be retried with the default policy. See retry_rs::policy::DEFAULT_POLICY.
+    /// Does not begin the retry process until run() is called on the Retryer. The policy can be updated with set_policy().
+    fn prepare(&self) -> Retryer<T, E>
     where
-        Self: Sized
+        Self: Sized,
     {
-
-        let __self = self as &dyn Executor<T, E>;
-        let b = Box::new(__self);
-        BoxRetryer {
+        Retryer {
             policy: util::OwnedOrRef::Owned(DEFAULT_POLICY),
             count: 0,
-            function: b
+            function: Box::new(self),
         }
     }
 
+    /// Attempts to execute and retry the executor with a policy.
     async fn retry_with_policy(&self, policy: RetryPolicy) -> Result<T, E>
     where
         Self: Sized + 'static,
         T: Send + Sync,
         E: Send + Sync,
     {
-        BoxRetryer {
+        Retryer {
             policy: util::OwnedOrRef::Owned(policy),
             count: 0,
-            function: Box::new(self)
+            function: Box::new(self),
         }
-            .run()
-            .await
+        .run()
+        .await
     }
 
+    /// Attempts to execute and retry the executor with a borrowed policy
+    fn retry_with_policy_ref<'a>(&'a self, policy: &'a RetryPolicy) -> Retryer<'a, T, E>
+    where
+        Self: Sized + 'static,
+    {
+        Retryer {
+            policy: util::OwnedOrRef::Ref(policy),
+            count: 0,
+            function: Box::new(self),
+        }
+    }
+
+    /// Attempts to execute and retry the executor with the default policy. See retry_rs::policy::DEFAULT_POLICY.
     async fn retry_with_default_policy(&self) -> Result<T, E>
     where
         Self: Sized + 'static,
         T: Send + Sync,
         E: Send + Sync,
     {
-        BoxRetryer {
+        Retryer {
             policy: util::OwnedOrRef::Owned(DEFAULT_POLICY),
             count: 0,
             function: Box::new(self),
         }
-            .run()
-            .await
-    }
-
-    async fn call(self) -> RetryResult<T, E>
-    where
-        Self: Sized + 'static,
-    {
-        self.execute().await
-    }
-
-    fn use_policy(&self, policy: RetryPolicy) -> BoxRetryer<T, E>
-    where
-        Self: Sized + 'static,
-    {
-        BoxRetryer {
-            policy: util::OwnedOrRef::Owned(policy),
-            count: 0,
-            function: Box::new(self),
-        }
+        .run()
+        .await
     }
 }
-
 
 pub type AsyncFunction<'a, T, E> = Box<&'a dyn Executor<T, E>>;

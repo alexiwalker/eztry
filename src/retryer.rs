@@ -1,16 +1,15 @@
 use crate::policy::RetryPolicy;
 use crate::prelude::AsyncFunction;
 use crate::retry_result::RetryResult;
-use crate::{util};
+use crate::util;
 
-
-pub struct BoxRetryer<'a, T, E> {
+pub struct Retryer<'a, T, E> {
     pub(crate) policy: util::OwnedOrRef<'a, RetryPolicy>,
     pub(crate) count: usize, /* not pub, meant to be internal only */
     pub(crate) function: AsyncFunction<'a, T, E>,
 }
 
-impl<T, E> BoxRetryer<'_, T, E> {
+impl<T, E> Retryer<'_, T, E> {
     pub async fn run(&mut self) -> Result<T, E> {
         let f = &self.function;
         let policy = self.policy.as_ref();
@@ -38,14 +37,19 @@ impl<T, E> BoxRetryer<'_, T, E> {
     }
 }
 
-
-pub(crate) struct ClosureRetryer<'a, T, E, F> where F: AsyncFn() -> RetryResult<T, E> + Send + Sync {
+pub struct ClosureRetryer<'a, T, E, F>
+where
+    F: AsyncFn() -> RetryResult<T, E> + Send + Sync,
+{
     pub(crate) policy: util::OwnedOrRef<'a, RetryPolicy>,
     pub(crate) count: usize, /* not pub, meant to be internal only */
-    pub(crate) function: F
+    pub(crate) function: F,
 }
 
-impl<T, E, F> ClosureRetryer<'_, T, E, F> where F: AsyncFn() -> RetryResult<T, E> + Send + Sync {
+impl<T, E, F> ClosureRetryer<'_, T, E, F>
+where
+    F: AsyncFn() -> RetryResult<T, E> + Send + Sync,
+{
     pub async fn run(mut self) -> Result<T, E> {
         let f = &self.function;
         let policy = self.policy.as_ref();

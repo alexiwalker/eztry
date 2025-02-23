@@ -974,6 +974,7 @@ dependencies = [
  "async-trait",
  "rand 0.9.0",
  "retry-rs-macros",
+ "serde",
  "tokio",
 ]
 

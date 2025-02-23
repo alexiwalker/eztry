@@ -2,10 +2,9 @@
 mod agent;
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
     use crate::agent::*;
+    use rand::Rng;
     use retry_rs::prelude::*;
-    
 
     type DemoStructWithAsync = MutableAgent;
     /*the function here should always pass, its to make sure that what I am passing can be passed to async functions*/
@@ -79,10 +78,8 @@ mod tests {
         assert!(res.is_ok())
     }
 
-
     #[tokio::test]
     async fn runs_only_specified_number() {
-
         fn policy() -> RetryPolicy {
             RetryPolicyBuilder::new()
                 .limit(RetryLimit::Limited(1))
@@ -92,7 +89,7 @@ mod tests {
         }
 
         #[retry(policy)]
-        async fn f(agent:MutableAgent) -> RetryResult<(),()> {
+        async fn f(agent: MutableAgent) -> RetryResult<(), ()> {
             let _ = agent.execute().await;
             Retry(())
         }
@@ -102,14 +99,11 @@ mod tests {
         let res = f(agent.clone()).await;
 
         assert!(res.is_err());
-        assert_eq!(agent.count().await , 1);
-
+        assert_eq!(agent.count().await, 1);
     }
-
 
     #[tokio::test]
     async fn runs_only_specified_number_again() {
-
         fn policy() -> RetryPolicy {
             RetryPolicyBuilder::new()
                 .limit(RetryLimit::Limited(100))
@@ -119,15 +113,11 @@ mod tests {
         }
 
         #[retry(policy)]
-        async fn f(agent:MutableAgent) -> RetryResult<(),()> {
+        async fn f(agent: MutableAgent) -> RetryResult<(), ()> {
             let r = agent.execute().await;
             match r {
-                Ok(_) => {
-                    Success(())
-                }
-                Err(_) => {
-                    Retry(())
-                }
+                Ok(_) => Success(()),
+                Err(_) => Retry(()),
             }
         }
 
@@ -136,15 +126,11 @@ mod tests {
         let res = f(agent.clone()).await;
 
         assert!(res.is_err());
-        assert_eq!(agent.count().await , 100);
-
+        assert_eq!(agent.count().await, 100);
     }
-
-
 
     #[tokio::test]
     async fn wont_run_multiple_times_on_success() {
-
         fn policy() -> RetryPolicy {
             RetryPolicyBuilder::new()
                 .limit(RetryLimit::Limited(2))
@@ -154,15 +140,11 @@ mod tests {
         }
 
         #[retry(policy)]
-        async fn f(agent:MutableAgent) -> RetryResult<(),()> {
+        async fn f(agent: MutableAgent) -> RetryResult<(), ()> {
             let r = agent.execute().await;
             match r {
-                Ok(_) => {
-                    Success(())
-                }
-                Err(_) => {
-                    Retry(())
-                }
+                Ok(_) => Success(()),
+                Err(_) => Retry(()),
             }
         }
 
@@ -171,27 +153,20 @@ mod tests {
         let res = f(agent.clone()).await;
 
         assert!(res.is_ok());
-        assert_eq!(agent.count().await , 1);
-
+        assert_eq!(agent.count().await, 1);
     }
 
     #[retry_prepare]
-    pub async fn ref_function(agent: MutableAgent, _:&str) -> RetryResult<(), ()> {
+    pub async fn ref_function(agent: MutableAgent, _: &str) -> RetryResult<(), ()> {
         let r = agent.execute().await;
         match r {
-            Ok(_) => {
-                Success(())
-            }
-            Err(_) => {
-                Retry(())
-            }
+            Ok(_) => Success(()),
+            Err(_) => Retry(()),
         }
     }
 
-
     #[tokio::test]
     async fn can_run_prepared_function_on_policy() {
-
         fn policy() -> RetryPolicy {
             RetryPolicy::builder()
                 .limit(RetryLimit::Limited(2))
@@ -204,24 +179,16 @@ mod tests {
         pub async fn f(agent: MutableAgent) -> RetryResult<(), ()> {
             let r = agent.execute().await;
             match r {
-                Ok(_) => {
-                    Success(())
-                }
-                Err(_) => {
-                    Retry(())
-                }
+                Ok(_) => Success(()),
+                Err(_) => Retry(()),
             }
         }
         #[retry]
         pub async fn f3(agent: MutableAgent) -> RetryResult<(), ()> {
             let r = agent.execute().await;
             match r {
-                Ok(_) => {
-                    Success(())
-                }
-                Err(_) => {
-                    Retry(())
-                }
+                Ok(_) => Success(()),
+                Err(_) => Retry(()),
             }
         }
 
@@ -229,32 +196,26 @@ mod tests {
         let v = f(agent.clone());
         let res = policy().call(v).await;
         assert!(res.is_ok());
-        assert_eq!(agent.count().await , 1);
+        assert_eq!(agent.count().await, 1);
         let agent = FallibleAgent::mutable(FallibleBehaviour::AlwaysSucceed);
         let some_str = "hello";
         let v = ref_function(agent.clone(), some_str);
         let res = policy().call(v).await;
 
-
         assert!(res.is_ok());
-        assert_eq!(agent.count().await , 1);
-
+        assert_eq!(agent.count().await, 1);
 
         let _ = f3(agent.clone()).await;
 
-
         // policy().call()
-
     }
 
     fn get_async_demo_agent() -> DemoStructWithAsync {
         FallibleAgent::mutable(FallibleBehaviour::AlwaysSucceed)
     }
 
-
     #[tokio::test]
-    async fn async_closure_testing(){
-
+    async fn async_closure_testing() {
         //retry_function
         let policy = RetryPolicy::builder()
             .limit(RetryLimit::Limited(20))
@@ -262,16 +223,13 @@ mod tests {
             .base_delay(15)
             .build();
 
-        let agent = crate::agent::FallibleAgent::mutable(crate::agent::FallibleBehaviour::SucceedAfter(15));
+        let agent =
+            crate::agent::FallibleAgent::mutable(crate::agent::FallibleBehaviour::SucceedAfter(15));
 
         let f = || async {
             match agent.execute().await {
-                Ok(_v) => {
-                    Success(())
-                }
-                Err(_e) => {
-                    Retry(())
-                }
+                Ok(_v) => Success(()),
+                Err(_e) => Retry(()),
             }
         };
 
@@ -281,12 +239,10 @@ mod tests {
 
         assert!(res.is_ok());
         assert_eq!(count, 15);
-
     }
 
     #[tokio::test]
-    async fn async_closure_testing_impl_on_closure(){
-
+    async fn async_closure_testing_impl_on_closure() {
         //retry_function
         let policy = RetryPolicy::builder()
             .limit(RetryLimit::Limited(20))
@@ -294,38 +250,34 @@ mod tests {
             .base_delay(15)
             .build();
 
-        let agent = crate::agent::FallibleAgent::mutable(crate::agent::FallibleBehaviour::SucceedAfter(15));
+        let agent =
+            crate::agent::FallibleAgent::mutable(crate::agent::FallibleBehaviour::SucceedAfter(15));
 
         let res = (|| async {
             match agent.execute().await {
-                Ok(_v) => {
-                    Success(())
-                }
-                Err(_e) => {
-                    Retry(())
-                }
+                Ok(_v) => Success(()),
+                Err(_e) => Retry(()),
             }
-        }).retry(&policy).await;
+        })
+        .retry(&policy)
+        .await;
 
         let count = agent.count().await;
 
         assert!(res.is_ok());
         assert_eq!(count, 15);
-
     }
-
 
     fn generate_random_number() -> u8 {
         let mut rng = rand::rng();
         rng.random_range(1..=100)
     }
-    
-    
+
     const INTERMITTENT_ERROR: &str = "intermittent error";
     const SIMULATED_ERROR: &str = "simulated error";
-    
+
     const INPUT_STR: &str = "test string";
-    
+
     #[tokio::test]
     async fn rng_testing() {
         struct PreparedExampleFunction(u32, String);
@@ -353,7 +305,7 @@ mod tests {
         }
 
         let func = PreparedExampleFunction(1u32, INPUT_STR.to_string());
-        let mut ex = func.default_retry_policy();
+        let mut ex = func.prepare();
 
         let p = RetryPolicy {
             limit: RetryLimit::Limited(10),
@@ -367,11 +319,10 @@ mod tests {
 
         match r {
             Ok(v) => {
-                assert_eq!(v,  format!("1_{INPUT_STR}"));
+                assert_eq!(v, format!("1_{INPUT_STR}"));
                 println!("Success: {}", v);
             }
             Err(e) => {
-                
                 if e.as_str() == SIMULATED_ERROR {
                     return;
                 }
