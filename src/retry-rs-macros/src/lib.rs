@@ -1,7 +1,7 @@
+use function_info::FunctionInfo;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use syn::{parse_macro_input, ItemFn};
-use function_info::FunctionInfo;
 
 mod function_info;
 mod parser;
@@ -31,7 +31,7 @@ mod parser;
 ///         Err(val) => {
 ///             let v = val.get().unwrap() as u32;
 ///             if v == 0 {
-///                 Fatal(v)
+///                 Abort(v)
 ///             } else {
 ///                 Retry(v)
 ///             }
@@ -84,7 +84,7 @@ pub fn retry_prepare(_attr: TokenStream, item: TokenStream) -> TokenStream {
 ///         Err(val) => {
 ///             let v = val.get().unwrap() as u32;
 ///             if v == 0 {
-///                 Fatal(v)
+///                 Abort(v)
 ///             } else {
 ///                 Retry(v)
 ///             }
@@ -114,4 +114,3 @@ pub fn retry(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(expanded)
 }
-
