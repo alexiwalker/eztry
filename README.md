@@ -17,8 +17,8 @@ and a constant 1-second delay between attempts
 ```rust
 
 #[retry]
-async fn retryable_function(agent: DemoStructWithAsync) -> RetryResult<u32, u32> {
-	let res = agent.execute_async().await;
+async fn retryable_function(demo: DemoStructWithAsync) -> RetryResult<u32, u32> {
+	let res = demo.execute_async().await;
 	match res {
 		Ok(val) => Success(val.get().unwrap() as u32),
 		Err(val) => {
@@ -33,8 +33,8 @@ async fn retryable_function(agent: DemoStructWithAsync) -> RetryResult<u32, u32>
 }
 
 async fn retry_function() {
-	let agent = get_async_demo_agent();
-	let res = retryable_function(agent).await;
+	let demo = get_demo_struct();
+	let res = retryable_function(demo).await;
 	println!("success: {}", res.is_ok())
 }
 
@@ -59,9 +59,8 @@ fn retry_5_times() -> RetryPolicy {
 }
 
 #[retry(retry_5_times)]
-async fn agent_executor(agent: DemoStructWithAsync) -> RetryResult<u32, u32> {
-	let mut guard = agent.lock().await;
-	let res = guard.execute_async().await;
+async fn agent_executor(demo: DemoStructWithAsync) -> RetryResult<u32, u32> {
+	let res = demo.execute_async().await;
 	match res {
 		Ok(val) => Success(val.get().unwrap() as u32),
 		Err(val) => Retry(val.get().unwrap() as u32),
@@ -69,8 +68,8 @@ async fn agent_executor(agent: DemoStructWithAsync) -> RetryResult<u32, u32> {
 }
 
 async fn retry_function() {
-	let agent = get_async_demo_agent();
-	let res = agent_executor(agent).await;
+	let demo = get_demo_struct();
+	let res = agent_executor(demo).await;
 	println!("success: {}", res.is_ok())
 }
 
@@ -81,7 +80,6 @@ async fn retry_function() {
 #### Using #[retry-prepare] to prepare the function without executing it
 
 This converts the original functions into a struct holding all the necessary information to execute the function
-
 including its arguments and the retry policy to use.
 
 Once the struct is created, specify the policy with the retry_with_policy and retry_with_default_policy methods and then
@@ -91,9 +89,8 @@ Once the struct is created, specify the policy with the retry_with_policy and re
 
 
 #[retry_prepare]
-async fn prepared_executor(agent: DemoStructWithAsync) -> RetryResult<u32, u32> {
-	let mut guard = agent.lock().await;
-	let res = guard.execute_async().await;
+async fn prepared_executor(demo: DemoStructWithAsync) -> RetryResult<u32, u32> {
+	let res = demo.execute_async().await;
 	match res {
 		Ok(val) => Success(val.get().unwrap() as u32),
 		Err(val) => {
@@ -109,8 +106,8 @@ async fn prepared_executor(agent: DemoStructWithAsync) -> RetryResult<u32, u32> 
 
 #[tokio::test]
 async fn prepared_function() {
-	let agent = get_async_demo_agent();
-	let res = prepared_executor(agent).retry_with_default_policy().await;
+	let demo = get_demo_struct();
+	let res = prepared_executor(demo).retry_with_default_policy().await;
 	println!("success: ", res.is_ok())
 }
 
