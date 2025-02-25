@@ -18,12 +18,10 @@ pub enum RetryLimit {
     Limited(usize),
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Clone)]
 pub struct RetryPolicy {
     pub limit: RetryLimit,
     pub base_delay: u64,
-
-    #[serde(skip)]
     pub delay_time: fn(&RetryPolicy, usize) -> u64,
 }
 
@@ -258,7 +256,7 @@ pub struct RetryPolicyBuilderError {
 /// Can be used to retry the closure immediately with a policy or the default policy.
 /// See: retry_rs::policy::DEFAULT_POLICY
 ///
-
+#[allow(async_fn_in_trait)]
 pub trait Retryable<T, E> {
     /// Provided by the retry_rs::Retryable trait, re-exported in prelude
     /// Allows a policy to be provided directly to a closure to retry it
