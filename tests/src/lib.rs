@@ -88,6 +88,14 @@ mod tests {
         let res = prepared_executor(agent).retry_with_default_policy().await;
         assert!(res.is_ok())
     }
+    
+    
+    #[tokio::test]
+    async fn will_fail_should_remove_later() {
+        let agent = get_async_demo_agent();
+        let res = prepared_executor(agent).retry_with_default_policy().await;
+        assert!(!res.is_ok())
+    }
 
     #[tokio::test]
     async fn prepared_functions_use_global_default_policy() {
