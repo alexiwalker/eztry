@@ -8,7 +8,7 @@ mod tests {
     use retry_rs::prelude::*;
 
     type DemoStructWithAsync = MutableAgent;
-    /*the function here should always pass, its to make sure that what I am passing can be passed to async functions*/
+    /*the function here should always pass, it's to make sure that what I am passing can be passed to async functions*/
     async fn takes_an_agent(agent: DemoStructWithAsync) -> FallibleResult {
         let mut guard = agent.lock().await;
         guard.execute_async().await
@@ -96,7 +96,7 @@ mod tests {
         /* SETUP DEFAULTS */
 
         let policy = RetryPolicy::builder()
-            .limit(RetryLimit::Limited(DEFAULT_RETRIES))
+            .limit(RetryLimit::Limited(50))
             .backoff_policy(constant_backoff)
             .base_delay(1) //1 ms delay so it runs quickly
             .build_with_defaults();
@@ -166,10 +166,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn closures_use_global_default_policy() {
+    async fn retry_directly_on_closure() {
         const DEFAULT_RETRIES: u64 = 50;
 
-        /* SETUP DEFAULTs*/
+        /* SETUP DEFAULTS */
         let policy = RetryPolicy::builder()
             .limit(RetryLimit::Limited(DEFAULT_RETRIES))
             .backoff_policy(constant_backoff)
@@ -193,8 +193,50 @@ mod tests {
         assert!(&res.is_ok());
         assert_eq!(count, DEFAULT_RETRIES);
 
-        /* RESET DEFAULTS */
+    }
+    
+    #[tokio::test]
+    async fn retry_directly_on_closure_with_policy() {
+        const DEFAULT_RETRIES: u64 = 4;
 
+        /* SETUP DEFAULTS */
+        let policy = RetryPolicy::builder()
+            .limit(RetryLimit::Limited(DEFAULT_RETRIES))
+            .backoff_policy(constant_backoff)
+            .base_delay(1) //1 ms delay so it runs quickly
+            .build_with_defaults();
+
+        let agent = get_delayed_success_agent(DEFAULT_RETRIES);
+
+        let res = (|| async {
+            match agent.execute().await {
+                Ok(_v) => Success(()),
+                Err(_e) => Retry(()),
+            }
+        }).retry(&policy).await;
+
+        let count = agent.count().await;
+        assert!(&res.is_ok());
+        assert_eq!(count, DEFAULT_RETRIES);
+
+    }
+    
+    
+    #[tokio::test]
+    async fn closures_use_global_default_policy() {
+        const DEFAULT_RETRIES: u64 = 50;
+
+        /* SETUP DEFAULTS */
+        let policy = RetryPolicy::builder()
+            .limit(RetryLimit::Limited(DEFAULT_RETRIES))
+            .backoff_policy(constant_backoff)
+            .base_delay(1) //1 ms delay so it runs quickly
+            .build_with_defaults();
+
+        global::set_default_policy(policy);
+        
+        /* Policy being tested after change by other tests*, so can reset immediately */
+        
         global::reset_default_policy();
 
         /* TEST WITH RESTORED DEFAULTS */
@@ -310,7 +352,6 @@ mod tests {
                 .base_delay(15)
                 .build()
         }
-
         #[retry_prepare]
         pub async fn f(agent: MutableAgent) -> RetryResult<(), ()> {
             let r = agent.execute().await;
@@ -319,6 +360,7 @@ mod tests {
                 Err(_) => Retry(()),
             }
         }
+
         #[retry]
         pub async fn f3(agent: MutableAgent) -> RetryResult<(), ()> {
             let r = agent.execute().await;
@@ -364,7 +406,7 @@ mod tests {
             .build();
 
         let agent =
-            crate::agent::FallibleAgent::mutable(crate::agent::FallibleBehaviour::SucceedAfter(15));
+            FallibleAgent::mutable(FallibleBehaviour::SucceedAfter(15));
 
         let f = || async {
             match agent.execute().await {
@@ -391,7 +433,7 @@ mod tests {
             .build();
 
         let agent =
-            crate::agent::FallibleAgent::mutable(crate::agent::FallibleBehaviour::SucceedAfter(15));
+            FallibleAgent::mutable(FallibleBehaviour::SucceedAfter(15));
 
         let res = (|| async {
             match agent.execute().await {

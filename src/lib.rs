@@ -49,16 +49,16 @@ pub mod global {
     use crate::backoff::constant_backoff;
     use crate::policy::RetryLimit;
     use crate::util::StaticWall;
-    use crate::{policy, RetryPolicy};
+    use crate::prelude::*;
     use std::ops::Deref;
     use std::sync::Mutex;
 
-    const CONST_POLICY: RetryPolicy = RetryPolicy {
+    const GLOBAL_DEFAULT_POLICY: RetryPolicy = RetryPolicy {
         limit: RetryLimit::Unlimited,
         base_delay: 1000,
         delay_time: constant_backoff,
     };
-    static DEFAULT_POLICY: Mutex<StaticWall<RetryPolicy>> = Mutex::new(StaticWall(&CONST_POLICY));
+    static DEFAULT_POLICY: Mutex<StaticWall<RetryPolicy>> = Mutex::new(StaticWall(&GLOBAL_DEFAULT_POLICY));
 
     /// Sets the default policy for all retryable functions
     ///
@@ -67,7 +67,7 @@ pub mod global {
     /// - This will overwrite the default policy for all retryable functions
     ///
     /// - This will leak the provided policy into the global scope. Calling it more than once will cause a memory leak
-    pub fn set_default_policy(policy: policy::RetryPolicy) {
+    pub fn set_default_policy(policy: RetryPolicy) {
         let mut lock = DEFAULT_POLICY.lock().unwrap();
         *lock = StaticWall::leak(policy);
     }
@@ -79,7 +79,10 @@ pub mod global {
     /// -  delay_time: constant_backoff
     pub fn reset_default_policy() {
         let mut lock = DEFAULT_POLICY.lock().unwrap();
-        *lock = StaticWall::leak(CONST_POLICY);
+        *lock = StaticWall::leak(GLOBAL_DEFAULT_POLICY);
+
+
+
     }
 
     /// Returns a static reference to the global retry policy

@@ -125,56 +125,6 @@ impl FunctionInfo {
             quote! {}
         };
 
-        let inner_mod_name = format_ident!("__{struct_name}_MOD_INTERNAL");
-
-        // let expanded = quote! {
-        //     #[allow(non_camel_case_types)]
-        //     struct #struct_name #lifetimes (#struct_fields);
-        //     impl retry_rs::prelude::Executor<#ret_type_t, #ret_type_e> for #struct_name #anon_lifetime {
-        //         #[allow(
-        //             elided_named_lifetimes,
-        //             clippy::async_yields_async,
-        //             clippy::diverging_sub_expression,
-        //             clippy::let_unit_value,
-        //             clippy::needless_arbitrary_self_type,
-        //             clippy::no_effect_underscore_binding,
-        //             clippy::shadow_same,
-        //             clippy::type_complexity,
-        //             clippy::type_repetition_in_bounds,
-        //             clippy::used_underscore_binding
-        //         )]
-        //         fn execute<'life0, 'async_trait>(
-        //             &'life0 self,
-        //         ) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = #output,> + ::core::marker::Send + 'async_trait,>,>
-        //         where
-        //             'life0: 'async_trait,
-        //             Self: 'async_trait,
-        //         {
-        //             Box::pin(async move {
-        //                 if let ::core::option::Option::Some(__ret) = ::core::option::Option::None::<
-        //                     #output,
-        //                 > {
-        //                     #[allow(unreachable_code)] return __ret;
-        //                 }
-        //                 let __self = self;
-        //                 let __ret: #output = {
-        //                     #inner_mod_name::#inner_fn_name(#param_names)
-        //                         .await
-        //                 };
-        //                 #[allow(unreachable_code)] __ret
-        //             })
-        //         }
-        //     }
-        //
-        //     #[doc(hidden)]
-        //     mod #inner_mod_name {
-        //         use super::*;
-        //         #[doc(hidden)]
-        //         #[inline(always)]
-        //         pub async fn #inner_fn_name #lifetimes (#inputs) -> #output #body
-        //     }
-        //
-        // };
         let expanded = quote! {
             #[allow(non_camel_case_types)]
             struct #struct_name #lifetimes (#struct_fields);
@@ -182,18 +132,14 @@ impl FunctionInfo {
             impl retry_rs::prelude::Executor<#ret_type_t, #ret_type_e> for #struct_name #anon_lifetime {
                 async fn execute( &self  ) -> #output
                 {
-                   #inner_mod_name::#inner_fn_name(#param_names)
+                    async fn #inner_fn_name #lifetimes (#inputs) -> #output #body
+                    
+                   #inner_fn_name(#param_names)
                                 .await
                 }
             }
 
-            #[doc(hidden)]
-            mod #inner_mod_name {
-                use super::*;
-                #[doc(hidden)]
-                #[inline(always)]
-                pub async fn #inner_fn_name #lifetimes (#inputs) -> #output #body
-            }
+
 
         };
 

@@ -74,12 +74,12 @@ impl RetryPolicy {
     }
 
     /// Runs a function against the given policy
-    pub async fn call<'a, Func, RetType, ErrType>(
-        &'a self,
+    pub async fn call<Func, RetType, ErrType>(
+        &self,
         executor: Func,
     ) -> Result<RetType, ErrType>
     where
-        Func: Executor<RetType, ErrType> + 'a,
+        Func: Executor<RetType, ErrType>,
     {
         Retryer {
             policy: crate::util::OwnedOrRef::Ref(self), /* Ref here to avoid consuming a policy we may want to use repeatedly */
@@ -89,8 +89,8 @@ impl RetryPolicy {
     }
 
     /// Runs a function against the given policy
-    pub async fn call_closure<'a, RetType: Send + Sync, ErrType: Send + Sync>(
-        &'a self,
+    pub async fn call_closure<RetType: Send + Sync, ErrType: Send + Sync>(
+        &self,
         f: impl AsyncFn() -> RetryResult<RetType, ErrType> + Send + Sync,
     ) -> Result<RetType, ErrType> {
         ClosureRetryer {

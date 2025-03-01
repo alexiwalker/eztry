@@ -5,7 +5,7 @@ pub fn exponential_backoff(policy: &RetryPolicy, attempt: u64) -> u64 {
 }
 
 pub fn linear_backoff(policy: &RetryPolicy, attempt: u64) -> u64 {
-    policy.base_delay * attempt as u64
+    policy.base_delay * attempt
 }
 
 pub fn constant_backoff(policy: &RetryPolicy, _attempt: u64) -> u64 {

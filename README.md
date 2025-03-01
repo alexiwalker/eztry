@@ -113,3 +113,128 @@ async fn prepared_function() {
 
 
 ```
+
+
+
+#### Retrying an async closure
+
+A trait exported by the prelude allows async closures to be retried directly without wrapping them with any other helpers.
+
+Versions exist to retry with the default policy, or with a specified policy.
+
+
+
+Default policy:
+
+
+```rust
+
+
+#[tokio::test]
+async fn retry_directly_on_closure() {
+    const DEFAULT_RETRIES: u64 = 50;
+
+    /* SETUP DEFAULTS */
+    let policy = RetryPolicy::builder()
+        .limit(RetryLimit::Limited(DEFAULT_RETRIES))
+        .backoff_policy(constant_backoff)
+        .base_delay(1) //1 ms delay so it runs quickly
+        .build_with_defaults();
+
+    global::set_default_policy(policy);
+
+    /* TEST WITH NEW DEFAULT */
+
+    let agent = get_delayed_success_agent(DEFAULT_RETRIES);
+
+    let res = (|| async {
+        match agent.execute().await {
+            Ok(_v) => Success(()),
+            Err(_e) => Retry(()),
+        }
+    }).retry_with_default_policy().await;
+
+    let count = agent.count().await;
+    assert!(&res.is_ok());
+    assert_eq!(count, DEFAULT_RETRIES);
+
+}
+    
+
+```
+
+
+Custom policy:
+
+```rust
+
+#[tokio::test]
+async fn retry_directly_on_closure_with_policy() {
+    const DEFAULT_RETRIES: u64 = 4;
+
+    /* SETUP DEFAULTS */
+    let policy = RetryPolicy::builder()
+        .limit(RetryLimit::Limited(DEFAULT_RETRIES))
+        .backoff_policy(constant_backoff)
+        .base_delay(1) //1 ms delay so it runs quickly
+        .build_with_defaults();
+
+    let agent = get_delayed_success_agent(DEFAULT_RETRIES);
+
+    let res = (|| async {
+        match agent.execute().await {
+            Ok(_v) => Success(()),
+            Err(_e) => Retry(()),
+        }
+    }).retry(&policy).await;
+
+    let count = agent.count().await;
+    assert!(&res.is_ok());
+    assert_eq!(count, DEFAULT_RETRIES);
+
+}
+    
+```
+
+
+
+
+#### Changing the global default policy
+
+The global default policy defaults to the following values:
+
+```rust
+
+const GLOBAL_DEFAULT_POLICY: RetryPolicy = RetryPolicy {
+    limit: RetryLimit::Unlimited,
+    base_delay: 1000,
+    delay_time: constant_backoff,
+};
+
+```
+
+This is the policy that will be used if no other policy is specified. The following methods exist in the exported global module:
+
+
+```rust
+
+pub mod global {
+
+	pub fn set_default_policy(policy: policy::RetryPolicy) { ... }
+
+	pub fn get_default_policy() -> &'static RetryPolicy { ... }
+
+	pub fn reset_default_policy() { ... }    
+    
+}
+
+```
+
+set_default_policy takes in a retry policy and sets it as the global default policy. WARNING: this leaks the policy into 'static, so ensure it is called only once.
+
+get_default_policy returns a reference to the global default policy - either the GLOBAL_DEFAULT_POLICY or the one set by set_default_policy
+
+reset_default_policy resets the global default policy to the default values specified above.
+
+
+Any methods that do not take a policy reference to retry, or are named with '..._with_default_policy' will use the global default policy. All other methods will require a policy to be provided
