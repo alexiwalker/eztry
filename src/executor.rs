@@ -1,4 +1,4 @@
-use crate::policy::{RetryPolicy, DEFAULT_POLICY};
+use crate::policy::RetryPolicy;
 use crate::retry_result::RetryResult;
 use crate::retryer::Retryer;
 use crate::util;
@@ -14,8 +14,9 @@ pub trait Executor<T, E>: Send + Sync {
     where
         Self: Sized,
     {
+        let pol = crate::global::get_default_policy();
         Retryer {
-            policy: util::OwnedOrRef::Owned(DEFAULT_POLICY),
+            policy: util::OwnedOrRef::Ref(pol),
             count: 0,
             function: Box::new(self),
         }
@@ -56,8 +57,10 @@ pub trait Executor<T, E>: Send + Sync {
         T: Send + Sync,
         E: Send + Sync,
     {
+        let pol = crate::global::get_default_policy();
+
         Retryer {
-            policy: util::OwnedOrRef::Owned(DEFAULT_POLICY),
+            policy: util::OwnedOrRef::Ref(pol),
             count: 0,
             function: Box::new(self),
         }

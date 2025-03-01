@@ -1,11 +1,11 @@
 use crate::policy::RetryPolicy;
 use crate::prelude::AsyncFunction;
 use crate::retry_result::RetryResult;
-use crate::util;
+use crate::{util};
 
 pub struct Retryer<'a, T, E> {
     pub(crate) policy: util::OwnedOrRef<'a, RetryPolicy>,
-    pub(crate) count: usize, /* not pub, meant to be internal only */
+    pub(crate) count: u64, /* not pub, meant to be internal only */
     pub(crate) function: AsyncFunction<'a, T, E>,
 }
 
@@ -32,7 +32,7 @@ impl<T, E> Retryer<'_, T, E> {
     pub fn set_policy(&mut self, policy: RetryPolicy) {
         self.policy = util::OwnedOrRef::Owned(policy);
     }
-    pub fn count(&self) -> usize {
+    pub fn count(&self) -> u64 {
         self.count
     }
 }
@@ -42,7 +42,7 @@ where
     F: AsyncFn() -> RetryResult<T, E> + Send + Sync,
 {
     pub(crate) policy: util::OwnedOrRef<'a, RetryPolicy>,
-    pub(crate) count: usize, /* not pub, meant to be internal only */
+    pub(crate) count: u64, /* not pub, meant to be internal only */
     pub(crate) function: F,
 }
 
@@ -72,7 +72,7 @@ where
     pub fn set_policy(&mut self, policy: RetryPolicy) {
         self.policy = util::OwnedOrRef::Owned(policy);
     }
-    pub fn count(&self) -> usize {
+    pub fn count(&self) -> u64 {
         self.count
     }
 }

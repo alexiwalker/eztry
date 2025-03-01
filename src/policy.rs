@@ -1,28 +1,22 @@
 use crate::backoff::*;
 use crate::executor::Executor;
 use crate::retryer::{ClosureRetryer, Retryer};
-use crate::{BackoffPolicy, RetryResult};
+use crate::{global, BackoffPolicy, RetryResult};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
-pub const DEFAULT_POLICY: RetryPolicy = RetryPolicy {
-    limit: RetryLimit::Unlimited,
-    base_delay: 1000,
-    delay_time: constant_backoff,
-};
-
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum RetryLimit {
     Unlimited,
-    Limited(usize),
+    Limited(u64),
 }
 
 #[derive(Debug, Clone)]
 pub struct RetryPolicy {
     pub limit: RetryLimit,
     pub base_delay: u64,
-    pub delay_time: fn(&RetryPolicy, usize) -> u64,
+    pub delay_time: fn(&RetryPolicy, u64) -> u64,
 }
 
 impl PartialEq for RetryLimit {
@@ -35,8 +29,8 @@ impl PartialEq for RetryLimit {
     }
 }
 
-impl PartialEq<usize> for RetryLimit {
-    fn eq(&self, other: &usize) -> bool {
+impl PartialEq<u64> for RetryLimit {
+    fn eq(&self, other: &u64) -> bool {
         match self {
             RetryLimit::Unlimited => false,
             RetryLimit::Limited(a) => a == other,
@@ -44,8 +38,8 @@ impl PartialEq<usize> for RetryLimit {
     }
 }
 
-impl PartialOrd<usize> for RetryLimit {
-    fn partial_cmp(&self, count: &usize) -> Option<Ordering> {
+impl PartialOrd<u64> for RetryLimit {
+    fn partial_cmp(&self, count: &u64) -> Option<Ordering> {
         match self {
             RetryLimit::Unlimited => Some(Ordering::Less),
             RetryLimit::Limited(lim) => match count.cmp(lim) {
@@ -56,26 +50,26 @@ impl PartialOrd<usize> for RetryLimit {
         }
     }
 }
-impl PartialEq<RetryLimit> for usize {
+impl PartialEq<RetryLimit> for u64 {
     fn eq(&self, other: &RetryLimit) -> bool {
         other.eq(self)
     }
 }
 
-impl PartialOrd<RetryLimit> for usize {
+impl PartialOrd<RetryLimit> for u64 {
     fn partial_cmp(&self, other: &RetryLimit) -> Option<Ordering> {
         other.partial_cmp(self)
     }
 }
 
 impl RetryPolicy {
-    pub async fn wait(&self, count: usize) {
+    pub async fn wait(&self, count: u64) {
         let t = (self.delay_time)(self, count);
         let t = std::time::Duration::from_millis(t);
         tokio::time::sleep(t).await;
     }
 
-    pub fn can_retry(&self, count: usize) -> bool {
+    pub fn can_retry(&self, count: u64) -> bool {
         count < self.limit
     }
 
@@ -164,7 +158,7 @@ impl RetryPolicyBuilder {
     /// and returns the time (in milliseconds) to wait before retrying the function
     /// Is called after the previous attempt has failed
     #[inline]
-    pub fn backoff_policy(mut self, backoff_policy: fn(&RetryPolicy, usize) -> u64) -> Self {
+    pub fn backoff_policy(mut self, backoff_policy: fn(&RetryPolicy, u64) -> u64) -> Self {
         self.backoff_policy = Some(backoff_policy);
         self
     }
@@ -318,7 +312,7 @@ where
     }
 
     async fn retry_with_default_policy(&self) -> Result<T, E> {
-        let policy = DEFAULT_POLICY;
+        let policy = global::get_default_policy();
         policy.call_closure(self).await
     }
 }
