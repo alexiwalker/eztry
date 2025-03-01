@@ -88,14 +88,6 @@ mod tests {
         let res = prepared_executor(agent).retry_with_default_policy().await;
         assert!(res.is_ok())
     }
-    
-    
-    #[tokio::test]
-    async fn will_fail_should_remove_later() {
-        let agent = get_async_demo_agent();
-        let res = prepared_executor(agent).retry_with_default_policy().await;
-        assert!(!res.is_ok())
-    }
 
     #[tokio::test]
     async fn prepared_functions_use_global_default_policy() {
@@ -202,7 +194,7 @@ mod tests {
         assert_eq!(count, DEFAULT_RETRIES);
 
     }
-    
+
     #[tokio::test]
     async fn retry_directly_on_closure_with_policy() {
         const DEFAULT_RETRIES: u64 = 4;
@@ -228,8 +220,8 @@ mod tests {
         assert_eq!(count, DEFAULT_RETRIES);
 
     }
-    
-    
+
+
     #[tokio::test]
     async fn closures_use_global_default_policy() {
         const DEFAULT_RETRIES: u64 = 50;
@@ -242,9 +234,9 @@ mod tests {
             .build_with_defaults();
 
         global::set_default_policy(policy);
-        
+
         /* Policy being tested after change by other tests*, so can reset immediately */
-        
+
         global::reset_default_policy();
 
         /* TEST WITH RESTORED DEFAULTS */
