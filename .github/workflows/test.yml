@@ -1,0 +1,33 @@
+
+name: Test
+
+# This workflow run tests and build for each push
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Update local toolchain
+        run: |
+          rustup update
+          rustup component add clippy
+          rustup install nightly
+
+      - name: Toolchain info
+        run: |
+          cargo --version --verbose
+          rustc --version
+          cargo clippy --version
+          
+          
+      # ./test is a script that runs tests with the correct args, rather than trying to maintain a long command here          
+      - name: Run tests
+        run: |
+          ./test

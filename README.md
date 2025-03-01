@@ -114,7 +114,7 @@ async fn prepared_function() {
 
 ```
 
-
+---
 
 #### Retrying an async closure
 
@@ -196,6 +196,7 @@ async fn retry_directly_on_closure_with_policy() {
     
 ```
 
+---
 
 
 
@@ -213,7 +214,10 @@ const GLOBAL_DEFAULT_POLICY: RetryPolicy = RetryPolicy {
 
 ```
 
-This is the policy that will be used if no other policy is specified. The following methods exist in the exported global module:
+This is the policy that will be used if no other policy is specified. 
+
+
+The following methods exist in the exported global module:
 
 
 ```rust
