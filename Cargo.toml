@@ -2,6 +2,10 @@
 name = "eztry"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "easy-to-use utilities to add retry logic to async functions"
+keywords = ["async", "retry"]
+categories = ["asynchronous"]
 
 [dependencies]
 async-trait = "0.1.86"
