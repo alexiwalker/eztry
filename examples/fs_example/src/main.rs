@@ -61,7 +61,14 @@ async fn write_to_file(ctr:Control) -> RetryResult<(),()> {
     }
 }
 
+/*
 
+This example should always eventually succeed and exit - after the bg thread finishes 100 loops and releases the file
+
+Used to demonstrate behaviour when a retry is needed to get a resource that is locked by another thread or service
+but backs off exponentially while it waits
+
+*/
 
 
 #[tokio::main]
@@ -108,7 +115,6 @@ async fn bg_thread(ctrl: Control) -> () {
 
 
     f.try_lock_exclusive().expect("bg_thread: Failed to lock file");
-    // let mut f = Flock::lock(f, FlockArg::LockExclusive).expect("Failed to lock file");
 
 
     { /* allows the retry thread to run and attempt to get the file - which it wont, because we have the file handle above*/

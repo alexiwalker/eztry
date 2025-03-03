@@ -41,7 +41,7 @@ impl SqliteDb {
         if row_id % 15 == 0 {
             Success(res_str)
         } else if row_id % 100 == 0 {
-            Abort(sqlx::Error::RowNotFound)
+            Abort(sqlx::Error::PoolClosed)
         } else {
             Retry(sqlx::Error::RowNotFound)
         }
@@ -68,7 +68,13 @@ fn policy() -> RetryPolicy {
         .limit(RetryLimit::Limited(10))
         .build()
 }
+/*
 
+This example will randomly fail, succeed, or retry based on RNG
+
+Used to demonstrate behaviour when things don't always work after N tries, and will exit eventually
+
+*/
 #[tokio::main]
 async fn main() {
     /* Simulating a bundle of resources that may be in a struct in a real-world API / Server*/
