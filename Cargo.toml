@@ -14,11 +14,17 @@ macros = ["dep:eztry-macros"]
 
 [workspace]
 members = [
+    # public code
     ".",
     "src/eztry-macros",
+
+    # tests
+    "tests",
+
+    # examples
     "examples/sqlx_sqlite_example",
-    "tests"
-, "examples/fs_example"]
+    "examples/fs_example",
+]
 
 
 [workspace.dependencies]
