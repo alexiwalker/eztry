@@ -18,7 +18,7 @@ members = [
     "src/retry-rs-macros",
     "examples/sqlx_sqlite_example",
     "tests"
-]
+, "examples/fs_example"]
 
 
 [workspace.dependencies]

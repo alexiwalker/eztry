@@ -80,9 +80,6 @@ pub mod global {
     pub fn reset_default_policy() {
         let mut lock = DEFAULT_POLICY.lock().unwrap();
         *lock = StaticWall::leak(GLOBAL_DEFAULT_POLICY);
-
-
-
     }
 
     /// Returns a static reference to the global retry policy
