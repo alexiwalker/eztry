@@ -367,6 +367,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "eztry"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "eztry-macros",
+ "serde",
+ "tokio",
+]
+
+[[package]]
+name = "eztry-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -413,10 +432,10 @@ name = "fs_example"
 version = "0.1.0"
 dependencies = [
  "env_logger",
+ "eztry",
  "fs2",
  "log",
  "nix",
- "retry-rs",
  "tokio",
 ]
 
@@ -1137,25 +1156,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
-name = "retry-rs"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "retry-rs-macros",
- "serde",
- "tokio",
-]
-
-[[package]]
-name = "retry-rs-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "rsa"
 version = "0.9.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1535,7 +1535,7 @@ dependencies = [
 name = "sqlx_sqlite_example"
 version = "0.1.0"
 dependencies = [
- "retry-rs",
+ "eztry",
  "sqlx",
  "tokio",
 ]
@@ -1603,8 +1603,8 @@ dependencies = [
 name = "tests"
 version = "0.1.0"
 dependencies = [
+ "eztry",
  "rand 0.9.0",
- "retry-rs",
  "tokio",
 ]
 

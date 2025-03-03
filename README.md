@@ -1,6 +1,6 @@
-# retry-rs
+# eztry
 
-retry-rs is a utility to make retrying async functions easier
+eztry is a utility to make retrying async functions easier
 
 Providing access to the underlying retry executors and policies as well as simple-to-use proc macros
 that allow the caller to specify the logic of a function without having to consider retry logic for each usage

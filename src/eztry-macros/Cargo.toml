@@ -1,5 +1,5 @@
 [package]
-name = "retry-rs-macros"
+name = "eztry-macros"
 version = "0.1.0"
 edition = "2021"
 

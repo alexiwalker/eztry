@@ -4,8 +4,8 @@ mod agent;
 mod tests {
     use crate::agent::*;
     use rand::Rng;
-    use retry_rs::global;
-    use retry_rs::prelude::*;
+    use eztry::global;
+    use eztry::prelude::*;
 
     type DemoStructWithAsync = MutableAgent;
     /*the function here should always pass, it's to make sure that what I am passing can be passed to async functions*/

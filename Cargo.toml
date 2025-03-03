@@ -1,26 +1,26 @@
 [package]
-name = "retry-rs"
+name = "eztry"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 async-trait = "0.1.86"
 tokio = { version = "1.43.0", features = ["time", "macros", "rt", "fs"] }
-retry-rs-macros = { workspace = true, optional = true }
+eztry-macros = { workspace = true, optional = true }
 serde = { version = "1.0.217", features = ["derive"] }
 
 [features]
-macros = ["dep:retry-rs-macros"]
+macros = ["dep:eztry-macros"]
 
 [workspace]
 members = [
     ".",
-    "src/retry-rs-macros",
+    "src/eztry-macros",
     "examples/sqlx_sqlite_example",
     "tests"
 , "examples/fs_example"]
 
 
 [workspace.dependencies]
-retry-rs = { path = "." }
-retry-rs-macros = { path = "src/retry-rs-macros" }
+eztry = { path = "." }
+eztry-macros = { path = "src/eztry-macros" }

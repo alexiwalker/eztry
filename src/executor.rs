@@ -8,7 +8,7 @@ use async_trait::async_trait;
 pub trait Executor<T, E>: Send + Sync {
     async fn execute(&self) -> RetryResult<T, E>;
 
-    /// Prepare the executor to be retried with the default policy. See retry_rs::policy::DEFAULT_POLICY.
+    /// Prepare the executor to be retried with the default policy. See eztry::policy::DEFAULT_POLICY.
     /// Does not begin the retry process until run() is called on the Retryer. The policy can be updated with set_policy().
     fn prepare(&self) -> Retryer<T, E>
     where
@@ -50,7 +50,7 @@ pub trait Executor<T, E>: Send + Sync {
         }
     }
 
-    /// Attempts to execute and retry the executor with the default policy. See retry_rs::policy::DEFAULT_POLICY.
+    /// Attempts to execute and retry the executor with the default policy. See eztry::policy::DEFAULT_POLICY.
     async fn retry_with_default_policy(&self) -> Result<T, E>
     where
         Self: Sized + 'static,

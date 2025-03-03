@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-retry-rs = { workspace = true, features = ["macros"] }
+eztry = { workspace = true, features = ["macros"] }
 tokio = { version = "1.43.0", features = ["full"] }
 nix = { version = "0.29.0", features = ["fs"] }
 fs2 = "0.4.3"

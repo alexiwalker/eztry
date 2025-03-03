@@ -129,7 +129,7 @@ impl FunctionInfo {
             #[allow(non_camel_case_types)]
             struct #struct_name #lifetimes (#struct_fields);
             #[async_trait]
-            impl retry_rs::prelude::Executor<#ret_type_t, #ret_type_e> for #struct_name #anon_lifetime {
+            impl eztry::prelude::Executor<#ret_type_t, #ret_type_e> for #struct_name #anon_lifetime {
                 async fn execute( &self  ) -> #output
                 {
                     async fn #inner_fn_name #lifetimes (#inputs) -> #output #body
@@ -197,17 +197,17 @@ impl FunctionInfo {
                            let r = self.#formatted_inner_fn_name(#without_receiver).await;
 
                            match r {
-                               retry_rs::RetryResult::Success(s) => {
+                               eztry::RetryResult::Success(s) => {
                                    return Ok(s);
                                }
-                               retry_rs::RetryResult::Retry(e) => {
+                               eztry::RetryResult::Retry(e) => {
                                    if !policy.can_retry(i) {
                                        return Err(e)
                                    } else {
                                        policy.wait(i).await
                                    }
                                }
-                               retry_rs::RetryResult::Abort(e) => {
+                               eztry::RetryResult::Abort(e) => {
                                    return Err(e)
                                }
                            }
@@ -222,7 +222,7 @@ impl FunctionInfo {
                     async fn  __inner__(#inputs) -> RetryResult<#ret_type_t, #ret_type_e> #body
 
                     #[async_trait]
-                    impl retry_rs::prelude::Executor<#ret_type_t, #ret_type_e> for __inner__struct {
+                    impl eztry::prelude::Executor<#ret_type_t, #ret_type_e> for __inner__struct {
                        async fn execute( & self) -> RetryResult<#ret_type_t, #ret_type_e>
                         {
                             __inner__(#param_names).await

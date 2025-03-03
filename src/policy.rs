@@ -248,11 +248,11 @@ pub struct RetryPolicyBuilderError {
 /// This trait is implemented for all async closures that return a RetryResult.
 ///
 /// Can be used to retry the closure immediately with a policy or the default policy.
-/// See: retry_rs::policy::DEFAULT_POLICY
+/// See: eztry::policy::DEFAULT_POLICY
 ///
 #[allow(async_fn_in_trait)]
 pub trait Retryable<T, E> {
-    /// Provided by the retry_rs::Retryable trait, re-exported in prelude
+    /// Provided by the eztry::Retryable trait, re-exported in prelude
     /// Allows a policy to be provided directly to a closure to retry it
     ///
     /// # Example
@@ -276,8 +276,8 @@ pub trait Retryable<T, E> {
     ///
     async fn retry(&self, policy: &RetryPolicy) -> Result<T, E>;
 
-    /// Provided by the retry_rs::Retryable trait, re-exported in prelude.
-    /// Retry the closure with the default policy. See: retry_rs::policy::DEFAULT_POLICY
+    /// Provided by the eztry::Retryable trait, re-exported in prelude.
+    /// Retry the closure with the default policy. See: eztry::policy::DEFAULT_POLICY
     ///
     /// # Example
     ///

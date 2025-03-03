@@ -1,4 +1,4 @@
-use retry_rs::prelude::*;
+use eztry::prelude::*;
 use sqlx::{Executor, Pool, Sqlite};
 use std::sync::Arc;
 

@@ -1,12 +1,12 @@
 #[cfg(feature = "macros")]
-extern crate retry_rs_macros;
+extern crate eztry_macros;
 pub use async_trait::async_trait;
 pub use executor::Executor;
 pub use policy::RetryPolicy;
 pub use retry_result::RetryResult;
 
 #[cfg(feature = "macros")]
-pub use retry_rs_macros::*;
+pub use eztry_macros::*;
 
 mod backoff;
 pub mod executor;
@@ -34,7 +34,7 @@ pub mod prelude {
     pub use crate::policy::Retryable;
 
     #[cfg(feature = "macros")]
-    pub use retry_rs_macros::*;
+    pub use eztry_macros::*;
 
     #[cfg(feature = "macros")]
     pub use crate::async_trait;
@@ -42,7 +42,7 @@ pub mod prelude {
 #[cfg(feature = "macros")]
 pub mod macros {
     pub use crate::async_trait;
-    pub use retry_rs_macros::*;
+    pub use eztry_macros::*;
 }
 
 pub mod global {

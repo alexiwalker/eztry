@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-retry-rs = { workspace = true, features = ["macros"] }
+eztry = { workspace = true, features = ["macros"] }
 
 sqlx = { version = "0.8.3", features = ["sqlite", "runtime-tokio"] }
 tokio = { version = "1.43.0", features = ["full"] }

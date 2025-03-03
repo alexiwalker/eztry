@@ -1,4 +1,4 @@
-use retry_rs::prelude::*;
+use eztry::prelude::*;
 
 use std::io::{Read, Write};
 use std::time::Duration;
@@ -59,17 +59,17 @@ async fn write_to_file(ctr:Control) -> RetryResult<(),()> {
 
 fn get_file(lock: bool) -> fs::File {
 
-    let mut f = fs::OpenOptions::new()
+    let f = fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .append(true)
         .open("./test_file.txt").unwrap();
-    
+
     if lock {
         f.try_lock_exclusive().expect("Failed to lock file");
     }
-    
+
     f
 
 }
@@ -86,7 +86,7 @@ but backs off exponentially while it waits
 
 #[tokio::main]
 async fn main() {
-    
+
     fs::exists("./test_file.txt").map(|_| fs::remove_file("./test_file.txt")).ok();
 
     env_logger::builder().filter_level(log::LevelFilter::Info).init();
@@ -97,7 +97,7 @@ async fn main() {
         .base_delay(50)
         .build();
 
-    retry_rs::global::set_default_policy(policy);
+    eztry::global::set_default_policy(policy);
 
     let ctrl = Arc::new(Mutex::new(ThreadControl::RunBackground));
 
@@ -120,14 +120,14 @@ async fn main() {
     let lines = out_str.lines();
     let count = lines.count();
     info!("fg_thread: read {} lines", count);
-    
+
     let last_line = out_str.lines().last().unwrap();
-    
-    
+
+
     assert_eq!(count, 100);
     assert_eq!(last_line, "Hello, world!");
-    
-    
+
+
     fs::exists("./test_file.txt").map(|_| fs::remove_file("./test_file.txt")).ok();
 
 
@@ -137,7 +137,7 @@ async fn main() {
 /// This simulates a busy FS that may have file operations fail due to file contention
 async fn bg_thread(ctrl: Control) -> () {
 
-    { 
+    {
         /* ensure the retry thread isnt running while we get the file*/
         /* the value of this mutex should already be run_bg when passed in, but for clarity*/
         let mut mg =ctrl.lock().await;
