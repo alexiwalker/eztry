@@ -1,7 +1,12 @@
 [package]
 name = "eztry-macros"
 version = "0.0.1"
-edition = "2021"
+edition = "2024"
+license = "MIT"
+description = "easy-to-use utilities to add retry logic to async functions"
+keywords = ["async", "retry", "macros"]
+categories = ["asynchronous"]
+repository = "https://github.com/alexiwalker/eztry"
 
 [dependencies]
 quote = "1.0.38"

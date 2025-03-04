@@ -6,6 +6,7 @@ license = "MIT"
 description = "easy-to-use utilities to add retry logic to async functions"
 keywords = ["async", "retry"]
 categories = ["asynchronous"]
+repository = "https://github.com/alexiwalker/eztry"
 
 [dependencies]
 async-trait = "0.1.86"
