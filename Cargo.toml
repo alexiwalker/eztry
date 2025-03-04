@@ -11,7 +11,7 @@ repository = "https://github.com/alexiwalker/eztry"
 [dependencies]
 async-trait = "0.1.86"
 tokio = { version = "1.43.0", features = ["time", "macros", "rt", "fs"] }
-eztry-macros = { workspace = true, optional = true }
+eztry-macros = {version = "0.0.1", optional = true }
 serde = { version = "1.0.217", features = ["derive"] }
 
 [features]
@@ -34,4 +34,8 @@ members = [
 
 [workspace.dependencies]
 eztry = { path = "." }
+eztry-macros = { path = "src/eztry-macros" }
+
+
+[patch.crates-io]
 eztry-macros = { path = "src/eztry-macros" }
