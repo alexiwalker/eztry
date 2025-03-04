@@ -61,7 +61,6 @@ fn get_file(lock: bool) -> fs::File {
 
     let f = fs::OpenOptions::new()
         .read(true)
-        .write(true)
         .create(true)
         .append(true)
         .open("./test_file.txt").unwrap();
@@ -135,7 +134,7 @@ async fn main() {
 
 
 /// This simulates a busy FS that may have file operations fail due to file contention
-async fn bg_thread(ctrl: Control) -> () {
+async fn bg_thread(ctrl: Control) {
 
     {
         /* ensure the retry thread isnt running while we get the file*/

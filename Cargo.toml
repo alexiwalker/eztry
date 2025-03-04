@@ -1,6 +1,6 @@
 [package]
 name = "eztry"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2024"
 license = "MIT"
 description = "easy-to-use utilities to add retry logic to async functions"
@@ -25,7 +25,7 @@ members = [
     # tests
     "tests",
 
-    # examples
+    # exampless
     "examples/sqlx_sqlite_example",
     "examples/fs_example",
 ]
